@@ -1,3 +1,15 @@
+CREATE EXTENSION IF NOT EXISTS unaccent;
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE FUNCTION f_unaccent(text) RETURNS text
+LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT
+AS $$ SELECT public.unaccent('public.unaccent', $1) $$;
+
+COMMENT ON FUNCTION f_unaccent(text) IS 'Bản IMMUTABLE của unaccent(). Dùng chung khi xây search_text và khi chuẩn hóa từ khóa tìm kiếm:
+f_unaccent(lower(normalize(x, NFC))). Không bỏ dấu ở tầng ứng dụng.
+';
+
 CREATE TYPE "publisher_status" AS ENUM (
   'pending',
   'verified',
@@ -154,7 +166,6 @@ CREATE TABLE "works" (
   "merged_into_id" uuid,
   "work_rating_avg" numeric(3,2),
   "work_rating_count" integer NOT NULL DEFAULT 0,
-  "search_text" text NOT NULL DEFAULT '',
   "created_by" uuid,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
@@ -163,7 +174,7 @@ CREATE TABLE "works" (
 CREATE TABLE "editions" (
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "work_id" uuid NOT NULL,
-  "isbn13" char(13) UNIQUE NOT NULL,
+  "isbn13" varchar(13) UNIQUE NOT NULL,
   "title" varchar(500) NOT NULL,
   "subtitle" varchar(500),
   "publisher_name" varchar(255),
@@ -176,6 +187,7 @@ CREATE TABLE "editions" (
   "managed_at" timestamptz,
   "edition_rating_avg" numeric(3,2),
   "edition_rating_count" integer NOT NULL DEFAULT 0,
+  "search_text" text NOT NULL DEFAULT '',
   "created_by" uuid,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
@@ -421,8 +433,6 @@ CREATE INDEX ON "role_permissions" ("permission_id");
 
 CREATE INDEX ON "user_roles" ("role_id");
 
-CREATE INDEX ON "works" USING GIN ("search_text");
-
 CREATE INDEX ON "works" ("merged_into_id");
 
 CREATE INDEX ON "editions" ("work_id");
@@ -435,7 +445,11 @@ CREATE INDEX ON "editions" ("language");
 
 CREATE UNIQUE INDEX ON "editions" ("id", "work_id");
 
-CREATE INDEX ON "contributors" USING GIN ("search_text");
+CREATE INDEX ON "editions" ("isbn13" text_pattern_ops);
+
+CREATE INDEX ON "editions" USING GIN ("search_text" gin_trgm_ops);
+
+CREATE INDEX ON "contributors" USING GIN ("search_text" gin_trgm_ops);
 
 CREATE INDEX ON "work_contributors" ("contributor_id");
 
@@ -593,13 +607,11 @@ COMMENT ON COLUMN "works"."merged_into_id" IS 'Khác null = đã bị gộp vào
 
 COMMENT ON COLUMN "works"."work_rating_avg" IS 'Cache điểm tác phẩm trung bình. Tính lại trong cùng transaction khi thêm, sửa, xóa, ẩn đánh giá';
 
-COMMENT ON COLUMN "works"."search_text" IS 'Không dấu, chữ thường: tên, tên gốc, tên ấn bản, tác giả, dịch giả';
-
 COMMENT ON COLUMN "works"."created_by" IS 'Thủ thư hoặc NXB đã tạo';
 
 COMMENT ON TABLE "editions" IS 'Từng bản in cụ thể của một tác phẩm (FR-25). Mọi ấn bản bắt buộc có ISBN.
-Unique index trên isbn13 cần text_pattern_ops (hoặc thêm index riêng)
-để LIKE ''prefix%'' dùng được index khi gán quyền theo ISBN prefix.
+Tìm kiếm (FR-12) trả về từng ấn bản, không nhóm theo tác phẩm.
+Index isbn13 text_pattern_ops để LIKE ''prefix%'' dùng được index khi gán quyền theo ISBN prefix.
 ';
 
 COMMENT ON COLUMN "editions"."isbn13" IS 'Bắt buộc. Chuẩn hóa về ISBN-13, chỉ chữ số';
@@ -618,6 +630,14 @@ COMMENT ON COLUMN "editions"."managed_at" IS 'Thời điểm được gán quy�
 
 COMMENT ON COLUMN "editions"."edition_rating_avg" IS 'Cache điểm ấn bản trung bình. Tính lại trong cùng transaction khi thêm, sửa, xóa, ẩn đánh giá';
 
+COMMENT ON COLUMN "editions"."search_text" IS 'Không dấu, chữ thường: tên ấn bản, contributor của ấn bản, tác giả của tác phẩm.
+Chỉ ghi qua rebuild_edition_search_text(), gọi trong cùng transaction khi:
+- Thêm ấn bản, sửa title, chuyển ấn bản sang tác phẩm khác: ấn bản đó.
+- Thêm/bỏ edition_contributors: ấn bản đó.
+- Thêm/bỏ work_contributors: mọi ấn bản của tác phẩm.
+- Đổi tên contributor: mọi ấn bản liên quan (qua tác phẩm hoặc qua ấn bản).
+';
+
 COMMENT ON TABLE "contributors" IS 'Người đóng góp dùng chung: tác giả, dịch giả, họa sĩ (FR-28).
 Chỉ Thủ thư và Admin được sửa. NXB chỉ được thêm mới và liên kết.
 ';
@@ -628,7 +648,7 @@ COMMENT ON COLUMN "contributors"."slug" IS 'Dùng cho URL trang tác giả (FR-1
 
 COMMENT ON COLUMN "contributors"."photo_url" IS 'Ảnh trên Cloudinary';
 
-COMMENT ON COLUMN "contributors"."search_text" IS 'Tên không dấu, chữ thường';
+COMMENT ON COLUMN "contributors"."search_text" IS 'f_unaccent(lower(normalize(name, NFC))), cập nhật khi đổi tên';
 
 COMMENT ON TABLE "work_contributors" IS 'Tác giả của tác phẩm.';
 
@@ -993,3 +1013,22 @@ ALTER TABLE "edition_reports" ADD FOREIGN KEY ("edition_id") REFERENCES "edition
 ALTER TABLE "revisions" ADD FOREIGN KEY ("restored_from_id") REFERENCES "revisions" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "revisions" ADD FOREIGN KEY ("changed_by") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
+CREATE FUNCTION rebuild_edition_search_text(edition_ids uuid[]) RETURNS void
+LANGUAGE sql AS $$
+  UPDATE editions e
+  SET search_text = f_unaccent(lower(normalize(concat_ws(' ',
+        e.title,
+        (SELECT string_agg(c.name, ' ')
+         FROM edition_contributors ec
+         JOIN contributors c ON c.id = ec.contributor_id
+         WHERE ec.edition_id = e.id),
+        (SELECT string_agg(c.name, ' ')
+         FROM work_contributors wc
+         JOIN contributors c ON c.id = wc.contributor_id
+         WHERE wc.work_id = e.work_id)
+      ), NFC)))
+  WHERE e.id = ANY(edition_ids);
+$$;
+
+COMMENT ON FUNCTION rebuild_edition_search_text(uuid[]) IS 'Xây lại editions.search_text. Tầng ứng dụng gọi trong cùng transaction với thay đổi dữ liệu.';
