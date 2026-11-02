@@ -8,6 +8,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(8080),
   FE_URL: z.url(),
   DATABASE_URL: z.url(),
+  REDIS_URL: z.url(),
   JWT_SECRET: z.string().min(32),
 });
 
@@ -26,5 +27,6 @@ export const env = {
   port: parsed.data.PORT,
   feUrl: parsed.data.FE_URL,
   databaseUrl: parsed.data.DATABASE_URL,
+  redisUrl: parsed.data.REDIS_URL,
   jwtSecret: parsed.data.JWT_SECRET,
 };

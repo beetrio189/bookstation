@@ -1,16 +1,19 @@
 # BookStation Backend
 
-NestJS, TypeORM, PostgreSQL.
+NestJS, TypeORM, PostgreSQL, Redis.
 
 ## Chạy local
 
 ```bash
-cp .env.example .env
+cp .env.example .env       # điền JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
 docker compose up -d
 npm install
 npm run migration:run
+npm run seed:admin
 npm run start:dev
 ```
+
+`seed:admin` chạy lại nhiều lần được. Nếu email đã tồn tại, lệnh chỉ gán role admin và không đổi mật khẩu.
 
 - API: http://localhost:8080/api
 - Health check: http://localhost:8080/api/health

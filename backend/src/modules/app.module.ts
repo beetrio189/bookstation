@@ -9,6 +9,7 @@ import { RolesGuard } from '../guards/roles.guard';
 import { ResponseInterceptor } from '../interceptors/response.interceptor';
 import dataSource from '../libs/typeorm.config';
 import { HealthCheckModule } from './health-check/health-check.module';
+import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
       secret: env.jwtSecret,
       signOptions: { expiresIn: '15m' },
     }),
+    RedisModule,
     HealthCheckModule,
     UsersModule,
   ],

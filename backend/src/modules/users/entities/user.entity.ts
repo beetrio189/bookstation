@@ -16,7 +16,6 @@ export class User {
   @Column({ type: 'varchar', length: 255, unique: true })
   email: string;
 
-  // Không tự select để không lộ ra response. Khi cần thì addSelect.
   @Column({
     name: 'password_hash',
     type: 'varchar',
