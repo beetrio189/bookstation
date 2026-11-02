@@ -4,9 +4,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { AppException } from '../utils/errors/app.exception';
-import { ERRORS } from '../utils/errors/errors';
-import { AllExceptionsFilter } from './all-exceptions.filter';
+import { AppException } from '../../src/utils/errors/app.exception';
+import { ERRORS } from '../../src/utils/errors/errors';
+import { AllExceptionsFilter } from '../../src/filters/all-exceptions.filter';
 
 describe('AllExceptionsFilter', () => {
   const json = jest.fn();

@@ -5,6 +5,7 @@ import { REDIS_CLIENT } from '../redis/redis.module';
 
 export enum OneTimeTokenPurpose {
   VERIFY_EMAIL = 'verify-email',
+  RESET_PASSWORD = 'reset-password',
 }
 
 const buildKey = (purpose: OneTimeTokenPurpose, token: string) =>

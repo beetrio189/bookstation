@@ -3,16 +3,16 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { CurrentUser } from '../decorators/current-user.decorator';
-import { Public } from '../decorators/public.decorator';
-import { Roles } from '../decorators/roles.decorator';
-import { AllExceptionsFilter } from '../filters/all-exceptions.filter';
-import { ResponseInterceptor } from '../interceptors/response.interceptor';
-import { RoleCode } from '../utils/enums/role-code.enum';
-import { AuthUser } from '../utils/types/auth-user';
-import { JwtPayload } from '../utils/types/jwt-payload';
-import { JwtAuthGuard } from './jwt-auth.guard';
-import { RolesGuard } from './roles.guard';
+import { CurrentUser } from '../../src/decorators/current-user.decorator';
+import { Public } from '../../src/decorators/public.decorator';
+import { Roles } from '../../src/decorators/roles.decorator';
+import { AllExceptionsFilter } from '../../src/filters/all-exceptions.filter';
+import { ResponseInterceptor } from '../../src/interceptors/response.interceptor';
+import { RoleCode } from '../../src/utils/enums/role-code.enum';
+import { AuthUser } from '../../src/utils/types/auth-user';
+import { JwtPayload } from '../../src/utils/types/jwt-payload';
+import { JwtAuthGuard } from '../../src/guards/jwt-auth.guard';
+import { RolesGuard } from '../../src/guards/roles.guard';
 
 const SECRET = 'test-secret-that-is-at-least-32-chars';
 

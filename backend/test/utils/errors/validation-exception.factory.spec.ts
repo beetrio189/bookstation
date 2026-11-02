@@ -1,6 +1,6 @@
 import { ValidationError } from 'class-validator';
-import { ERRORS } from './errors';
-import { validationExceptionFactory } from './validation-exception.factory';
+import { ERRORS } from '../../../src/utils/errors/errors';
+import { validationExceptionFactory } from '../../../src/utils/errors/validation-exception.factory';
 
 describe('validationExceptionFactory', () => {
   const failure = (overrides: Partial<ValidationError>) =>

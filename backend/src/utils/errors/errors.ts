@@ -74,4 +74,10 @@ export const ERRORS = {
     status: HttpStatus.BAD_REQUEST,
     message: 'Mật khẩu hiện tại không đúng',
   },
+  PASSWORD_NOT_SET: {
+    code: 2006,
+    status: HttpStatus.BAD_REQUEST,
+    message:
+      'Tài khoản chưa có mật khẩu, vui lòng dùng chức năng quên mật khẩu để tạo',
+  },
 } as const satisfies Record<string, ErrorDefinition>;

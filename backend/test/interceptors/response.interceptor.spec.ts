@@ -1,6 +1,6 @@
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { lastValueFrom, of } from 'rxjs';
-import { ResponseInterceptor } from './response.interceptor';
+import { ResponseInterceptor } from '../../src/interceptors/response.interceptor';
 
 describe('ResponseInterceptor', () => {
   const interceptor = new ResponseInterceptor();

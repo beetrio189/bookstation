@@ -94,6 +94,14 @@ CREATE TABLE "oauth_accounts" (
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
 
+CREATE TABLE "refresh_tokens" (
+  "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
+  "user_id" uuid NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+  "token_hash" char(64) NOT NULL,
+  "expires_at" timestamptz NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT (now())
+);
+
 CREATE TABLE "publishers" (
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "user_id" uuid UNIQUE NOT NULL,
@@ -425,6 +433,10 @@ CREATE UNIQUE INDEX ON "oauth_accounts" ("provider", "provider_user_id");
 
 CREATE UNIQUE INDEX ON "oauth_accounts" ("user_id", "provider");
 
+CREATE UNIQUE INDEX ON "refresh_tokens" ("token_hash");
+
+CREATE INDEX ON "refresh_tokens" ("user_id");
+
 CREATE INDEX ON "publishers" ("status");
 
 CREATE INDEX ON "publisher_isbn_prefixes" ("publisher_id");
@@ -538,6 +550,10 @@ COMMENT ON COLUMN "users"."locked_by" IS 'Admin đã khóa';
 COMMENT ON TABLE "oauth_accounts" IS 'Liên kết đăng nhập bên ngoài (FR-03). Mỗi user tối đa một tài khoản cho mỗi provider.';
 
 COMMENT ON COLUMN "oauth_accounts"."provider_user_id" IS 'ID "sub" Google trả về';
+
+COMMENT ON TABLE "refresh_tokens" IS 'Mỗi dòng là một phiên đăng nhập (FR-03, FR-04, FR-06). Đăng nhập trên nhiều thiết bị có nhiều dòng.';
+
+COMMENT ON COLUMN "refresh_tokens"."token_hash" IS 'SHA-256 của refresh token, token gốc chỉ nằm trong cookie';
 
 COMMENT ON TABLE "publishers" IS 'Hồ sơ tổ chức của tài khoản NXB, 1-1 với users (FR-08).
 Email tên miền công ty chính là users.email.

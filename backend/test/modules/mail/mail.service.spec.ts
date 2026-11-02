@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { env } from '../../config';
-import { MailService } from './mail.service';
+import { env } from '../../../src/config';
+import { MailService } from '../../../src/modules/mail/mail.service';
 
 const send = jest.fn();
 
@@ -22,6 +22,16 @@ describe('MailService', () => {
     expect(send).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
       'Email to a@example.com: http://localhost:3000/verify-email?token=abc-123',
+    );
+  });
+
+  it('links a password reset email to the reset page', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+
+    await new MailService().sendPasswordResetEmail('a@example.com', 'abc-123');
+
+    expect(log).toHaveBeenCalledWith(
+      'Email to a@example.com: http://localhost:3000/reset-password?token=abc-123',
     );
   });
 

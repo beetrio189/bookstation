@@ -24,6 +24,24 @@ export class UsersService {
     return this.usersRepository.findOneBy({ email });
   }
 
+  findByEmailForLogin(email: string): Promise<User | null> {
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .leftJoinAndSelect('user.userRoles', 'userRole')
+      .leftJoinAndSelect('userRole.role', 'role')
+      .where('user.email = :email', { email })
+      .getOne();
+  }
+
+  findByIdWithPassword(id: string): Promise<User | null> {
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.id = :id', { id })
+      .getOne();
+  }
+
   createReader(data: {
     email: string;
     passwordHash: string;
@@ -46,5 +64,13 @@ export class UsersService {
       { id, emailVerifiedAt: IsNull() },
       { emailVerifiedAt: new Date() },
     );
+  }
+
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    await this.usersRepository.update({ id }, { passwordHash });
+  }
+
+  async updateLastLogin(id: string): Promise<void> {
+    await this.usersRepository.update({ id }, { lastLoginAt: new Date() });
   }
 }

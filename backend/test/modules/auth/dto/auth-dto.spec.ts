@@ -1,7 +1,10 @@
 import { ValidationPipe } from '@nestjs/common';
-import { validationExceptionFactory } from '../../../utils/errors/validation-exception.factory';
-import { RegisterDto } from './register.dto';
-import { VerifyEmailDto } from './verify-email.dto';
+import { validationExceptionFactory } from '../../../../src/utils/errors/validation-exception.factory';
+import { ChangePasswordDto } from '../../../../src/modules/auth/dto/change-password.dto';
+import { LoginDto } from '../../../../src/modules/auth/dto/login.dto';
+import { RegisterDto } from '../../../../src/modules/auth/dto/register.dto';
+import { ResetPasswordDto } from '../../../../src/modules/auth/dto/reset-password.dto';
+import { VerifyEmailDto } from '../../../../src/modules/auth/dto/verify-email.dto';
 
 const pipe = new ValidationPipe({
   transform: true,
@@ -71,6 +74,61 @@ describe('auth DTOs', () => {
   ])('rejects %s', async (_case, override, message) => {
     await expect(
       validate(RegisterDto, { ...VALID, ...override }),
+    ).rejects.toMatchObject({ code: 1000, message });
+  });
+
+  it('does not apply the password rules when logging in', async () => {
+    await expect(
+      validate(LoginDto, { email: ' A@Example.COM ', password: 'ngan' }),
+    ).resolves.toEqual({ email: 'a@example.com', password: 'ngan' });
+  });
+
+  it.each([
+    ['a missing password', {}, 'Vui lòng nhập mật khẩu'],
+    ['an empty password', { password: '' }, 'Vui lòng nhập mật khẩu'],
+    ['a non-string password', { password: 123 }, 'Mật khẩu không hợp lệ'],
+  ])('rejects a login with %s', async (_case, override, message) => {
+    await expect(
+      validate(LoginDto, { email: VALID.email, ...override }),
+    ).rejects.toMatchObject({ code: 1000, message });
+  });
+
+  it.each([
+    ['a missing token', { token: undefined }, 'Thiếu mã đặt lại mật khẩu'],
+    [
+      'a short password',
+      { newPassword: 'ngan' },
+      'Mật khẩu phải có ít nhất 8 ký tự',
+    ],
+    ['a 75-byte password', { newPassword: 'ệ'.repeat(25) }, 'Mật khẩu quá dài'],
+  ])('rejects a password reset with %s', async (_case, override, message) => {
+    await expect(
+      validate(ResetPasswordDto, {
+        token: 'token-1',
+        newPassword: 'mat-khau-moi',
+        ...override,
+      }),
+    ).rejects.toMatchObject({ code: 1000, message });
+  });
+
+  it.each([
+    [
+      'a missing current password',
+      { currentPassword: undefined },
+      'Vui lòng nhập mật khẩu hiện tại',
+    ],
+    [
+      'a short new password',
+      { newPassword: 'ngan' },
+      'Mật khẩu phải có ít nhất 8 ký tự',
+    ],
+  ])('rejects a password change with %s', async (_case, override, message) => {
+    await expect(
+      validate(ChangePasswordDto, {
+        currentPassword: 'mat-khau-cu',
+        newPassword: 'mat-khau-moi',
+        ...override,
+      }),
     ).rejects.toMatchObject({ code: 1000, message });
   });
 

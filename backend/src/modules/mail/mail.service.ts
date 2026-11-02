@@ -32,6 +32,22 @@ export class MailService {
     });
   }
 
+  async sendPasswordResetEmail(to: string, token: string): Promise<void> {
+    const link = `${env.feUrl}/reset-password?token=${encodeURIComponent(token)}`;
+
+    await this.send({
+      to,
+      subject: 'Đặt lại mật khẩu BookStation',
+      html: `
+        <p>Chào bạn,</p>
+        <p>Bấm vào liên kết dưới đây để đặt lại mật khẩu BookStation. Liên kết có hiệu lực trong 30 phút.</p>
+        <p><a href="${link}">Đặt lại mật khẩu</a></p>
+        <p>Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email.</p>
+      `,
+      devNote: link,
+    });
+  }
+
   private async send({ to, subject, html, devNote }: MailMessage) {
     if (!this.resend) {
       this.logger.log(`Email to ${to}: ${devNote}`);

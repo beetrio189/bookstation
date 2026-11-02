@@ -2,7 +2,7 @@ import Redis from 'ioredis';
 import {
   OneTimeTokenPurpose,
   OneTimeTokenService,
-} from './one-time-token.service';
+} from '../../../src/modules/auth/one-time-token.service';
 
 describe('OneTimeTokenService', () => {
   const store = new Map<string, string>();

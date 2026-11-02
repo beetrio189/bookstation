@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
-import { ERRORS } from '../../utils/errors/errors';
-import { HealthCheckController } from './health-check.controller';
+import { ERRORS } from '../../../src/utils/errors/errors';
+import { HealthCheckController } from '../../../src/modules/health-check/health-check.controller';
 
 describe('HealthCheckController', () => {
   const query = jest.fn();
