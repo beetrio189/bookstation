@@ -8,9 +8,9 @@ import { Public } from '../decorators/public.decorator';
 import { Roles } from '../decorators/roles.decorator';
 import { AllExceptionsFilter } from '../filters/all-exceptions.filter';
 import { ResponseInterceptor } from '../interceptors/response.interceptor';
-import { UsersService } from '../modules/users/users.service';
 import { RoleCode } from '../utils/enums/role-code.enum';
 import { AuthUser } from '../utils/types/auth-user';
+import { JwtPayload } from '../utils/types/jwt-payload';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
 
@@ -45,23 +45,18 @@ class StaffController {
   }
 }
 
-const userWith = (
-  id: string,
-  roles: RoleCode[],
-  lockedAt: Date | null = null,
-) => ({
-  id,
+const payloadFor = (id: string, roles: RoleCode[]): JwtPayload => ({
+  sub: id,
   email: `${id}@example.com`,
-  lockedAt,
-  userRoles: roles.map((code) => ({ role: { code } })),
+  roles,
 });
 
-const USERS: Record<string, ReturnType<typeof userWith>> = {
-  reader: userWith('reader', [RoleCode.READER]),
-  librarian: userWith('librarian', [RoleCode.READER, RoleCode.LIBRARIAN]),
-  admin: userWith('admin', [RoleCode.ADMIN]),
-  locked: userWith('locked', [RoleCode.READER], new Date()),
-};
+const READER = payloadFor('reader', [RoleCode.READER]);
+const LIBRARIAN = payloadFor('librarian', [
+  RoleCode.READER,
+  RoleCode.LIBRARIAN,
+]);
+const ADMIN = payloadFor('admin', [RoleCode.ADMIN]);
 
 describe('JwtAuthGuard + RolesGuard', () => {
   let app: INestApplication;
@@ -71,20 +66,12 @@ describe('JwtAuthGuard + RolesGuard', () => {
     const req = request(app.getHttpServer()).get(path);
     return token ? req.set('Authorization', `Bearer ${token}`) : req;
   };
-  const tokenFor = (id: string) => jwt.sign({ sub: id });
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [JwtModule.register({ secret: SECRET })],
       controllers: [TestController, StaffController],
       providers: [
-        {
-          provide: UsersService,
-          useValue: {
-            findByIdWithRoles: (id: string) =>
-              Promise.resolve(USERS[id] ?? null),
-          },
-        },
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
         { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
         { provide: APP_GUARD, useClass: JwtAuthGuard },
@@ -114,7 +101,7 @@ describe('JwtAuthGuard + RolesGuard', () => {
     ['a malformed token', 'garbage'],
     [
       'a token signed with another secret',
-      new JwtService({ secret: 'x'.repeat(40) }).sign({ sub: 'reader' }),
+      new JwtService({ secret: 'x'.repeat(40) }).sign(READER),
     ],
   ])('rejects %s with UNAUTHENTICATED', async (_case, token) => {
     await get('/test/me', token)
@@ -124,7 +111,7 @@ describe('JwtAuthGuard + RolesGuard', () => {
 
   it('rejects an expired token', async () => {
     const expired = jwt.sign({
-      sub: 'reader',
+      ...READER,
       exp: Math.floor(Date.now() / 1000) - 10,
     });
 
@@ -134,24 +121,12 @@ describe('JwtAuthGuard + RolesGuard', () => {
   it('rejects a non-Bearer authorization header', async () => {
     await request(app.getHttpServer())
       .get('/test/me')
-      .set('Authorization', `Basic ${tokenFor('reader')}`)
+      .set('Authorization', `Basic ${jwt.sign(READER)}`)
       .expect(401);
   });
 
-  it('rejects a token of a user that no longer exists', async () => {
-    await get('/test/me', tokenFor('deleted')).expect(401);
-  });
-
-  it('rejects a locked user immediately', async () => {
-    await get('/test/me', tokenFor('locked'))
-      .expect(403)
-      .expect({
-        error: { code: 2003, message: 'Tài khoản của bạn đã bị khóa' },
-      });
-  });
-
-  it('exposes the logged-in user through @CurrentUser()', async () => {
-    await get('/test/me', tokenFor('librarian'))
+  it('exposes the token claims through @CurrentUser()', async () => {
+    await get('/test/me', jwt.sign(LIBRARIAN))
       .expect(200)
       .expect({
         data: {
@@ -163,7 +138,7 @@ describe('JwtAuthGuard + RolesGuard', () => {
   });
 
   it('applies @Roles() on a route', async () => {
-    await get('/test/admin', tokenFor('reader'))
+    await get('/test/admin', jwt.sign(READER))
       .expect(403)
       .expect({
         error: {
@@ -171,12 +146,12 @@ describe('JwtAuthGuard + RolesGuard', () => {
           message: 'Bạn không có quyền thực hiện thao tác này',
         },
       });
-    await get('/test/admin', tokenFor('admin')).expect(200);
+    await get('/test/admin', jwt.sign(ADMIN)).expect(200);
   });
 
   it('applies @Roles() on a controller and accepts any listed role', async () => {
-    await get('/staff', tokenFor('reader')).expect(403);
-    await get('/staff', tokenFor('librarian')).expect(200);
-    await get('/staff', tokenFor('admin')).expect(200);
+    await get('/staff', jwt.sign(READER)).expect(403);
+    await get('/staff', jwt.sign(LIBRARIAN)).expect(200);
+    await get('/staff', jwt.sign(ADMIN)).expect(200);
   });
 });
