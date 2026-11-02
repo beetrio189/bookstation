@@ -1,0 +1,52 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { Resend } from 'resend';
+import { env } from '../../config';
+
+interface MailMessage {
+  to: string;
+  subject: string;
+  html: string;
+  devNote: string;
+}
+
+@Injectable()
+export class MailService {
+  private readonly logger = new Logger(MailService.name);
+  private readonly resend = env.resendApiKey
+    ? new Resend(env.resendApiKey)
+    : null;
+
+  async sendVerificationEmail(to: string, token: string): Promise<void> {
+    const link = `${env.feUrl}/verify-email?token=${encodeURIComponent(token)}`;
+
+    await this.send({
+      to,
+      subject: 'Xác nhận tài khoản BookStation',
+      html: `
+        <p>Chào bạn,</p>
+        <p>Bấm vào liên kết dưới đây để xác nhận tài khoản BookStation. Liên kết có hiệu lực trong 24 giờ.</p>
+        <p><a href="${link}">Xác nhận tài khoản</a></p>
+        <p>Nếu bạn không đăng ký tài khoản này, hãy bỏ qua email.</p>
+      `,
+      devNote: link,
+    });
+  }
+
+  private async send({ to, subject, html, devNote }: MailMessage) {
+    if (!this.resend) {
+      this.logger.log(`Email to ${to}: ${devNote}`);
+      return;
+    }
+
+    const { error } = await this.resend.emails.send({
+      from: env.mailFrom as string,
+      to,
+      subject,
+      html,
+    });
+
+    if (error) {
+      throw new Error(`Resend: ${error.message}`);
+    }
+  }
+}

@@ -3,14 +3,34 @@ import { z } from 'zod';
 
 dotenv.config({ quiet: true });
 
-const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']),
-  PORT: z.coerce.number().default(8080),
-  FE_URL: z.url(),
-  DATABASE_URL: z.url(),
-  REDIS_URL: z.url(),
-  JWT_SECRET: z.string().min(32),
-});
+const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']),
+    PORT: z.coerce.number().default(8080),
+    FE_URL: z.url(),
+    DATABASE_URL: z.url(),
+    REDIS_URL: z.url(),
+    JWT_SECRET: z.string().min(32),
+    RESEND_API_KEY: z.string().optional(),
+    MAIL_FROM: z.string().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.RESEND_API_KEY && !value.MAIL_FROM) {
+      context.addIssue({
+        code: 'custom',
+        path: ['MAIL_FROM'],
+        message: 'Required when RESEND_API_KEY is set',
+      });
+    }
+
+    if (value.NODE_ENV === 'production' && !value.RESEND_API_KEY) {
+      context.addIssue({
+        code: 'custom',
+        path: ['RESEND_API_KEY'],
+        message: 'Required in production',
+      });
+    }
+  });
 
 const parsed = envSchema.safeParse(process.env);
 
@@ -29,4 +49,6 @@ export const env = {
   databaseUrl: parsed.data.DATABASE_URL,
   redisUrl: parsed.data.REDIS_URL,
   jwtSecret: parsed.data.JWT_SECRET,
+  resendApiKey: parsed.data.RESEND_API_KEY,
+  mailFrom: parsed.data.MAIL_FROM,
 };
