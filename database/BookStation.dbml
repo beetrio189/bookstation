@@ -1,0 +1,358 @@
+Enum "user_status" {
+  "active"
+  "locked"
+}
+
+Enum "role" {
+  "reader"
+  "publisher"
+  "editor"
+  "admin"
+}
+
+Enum "identity_provider" {
+  "local"
+  "google"
+}
+
+Enum "subscription_status" {
+  "none"
+  "basic"
+  "advanced"
+  "pro"
+}
+
+Enum "survey_status" {
+  "active"
+  "hidden"
+}
+
+Enum "report_status" {
+  "pending"
+  "resolved"
+  "dismissed"
+}
+
+Enum "report_target_type" {
+  "books"
+  "book_reviews"
+}
+
+Enum "system_action_type" {
+  "book_review"
+  "editor_creation"
+  "review_deletion"
+  "admin_creation"
+  "reader_lock"
+}
+
+Table "users" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "role" role [not null]
+  "status" user_status [not null, default: 'active', note: 'Nếu bị khóa thì thành locked, lúc đó tài khoản liên kết cũng chết luôn.']
+  "name" varchar(100) [not null]
+  "notification_email" varchar(255) [not null]
+  "notification_email_verified" bool [not null, note: 'Cái tài khoản đầu tiên đăng ký thì sẽ mặc định true, những lần đổi sau LUÔN phải xác nhận bằng email']
+  "avatar_url" text [note: 'URL ảnh trên Cloudinary']
+  "bio" text
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+  Note: 'Bảng người dùng.'
+}
+
+Table "refresh_tokens" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "user_id" uuid [not null]
+  "token_hash" char(64) [not null, note: 'SHA-256 của refresh token, token gốc chỉ nằm trong cookie']
+  "expires_at" timestamptz [not null]
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+
+  Indexes {
+    token_hash [unique]
+    user_id
+  }
+  Note: '''Mỗi dòng là một phiên đăng nhập (FR-03, FR-04, FR-06).
+Đăng nhập trên nhiều thiết bị có nhiều dòng.
+'''
+}
+
+Table "providers" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "user_id" uuid [not null]
+  "verified" bool
+  "provider" identity_provider [not null]
+  "provider_key" varchar(255) [not null, note: 'ID "sub" Google trả về']
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (provider, provider_key) [unique]
+    (user_id, provider) [unique]
+  }
+  Note: '''Liên kết đăng nhập. Có thể dùng cho local, google. Tương lai thêm Facebook.
+
+Với các phương pháp đăng nhập qua OAuth thì verified tự động = true. Nhưng nếu là
+local thì sẽ cần phải xác minh email.
+'''
+}
+
+Table "publishers" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "user_id" uuid [unique, not null]
+  "subscription_tier" subscription_status
+  "publisher_name" varchar(255) [not null, note: 'Tên tổ chức']
+  "slug" varchar(255) [unique, not null, note: 'Dùng cho URL trang NXB (FR-17)']
+  "logo_url" text
+  "description" text
+  "search_text" text [not null, note: 'Xây từ publisher_name, không dấu, dùng GIN']
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+
+  Indexes {
+    publisher_name
+    search_text [type: gin]
+  }
+  Note: '''Hồ sơ của nhà xuất bản.
+Mỗi nhà xuất bản chỉ có một tài khoản duy nhất.
+Mặc dù đã có name, avatar_url và bio ở bên users,
+vẫn dùng publisher_name, logo_url và description
+để về sau giả sử có thể tùy biến cho trang phát hành.
+'''
+}
+
+Table "editors" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "user_id" uuid [unique, not null]
+  "publisher_id" uuid [not null]
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+  Note: '''Biên tập viên do nhà xuất bản tạo.
+Những cột như name, bio, avatar_url đã có sẵn bên users.
+'''
+}
+
+Table "books" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "publisher_id" uuid [not null]
+  "title" varchar(500) [not null, note: 'Tên phổ biến tại Việt Nam']
+  "slug" varchar(255) [unique, not null]
+  "description" text [note: 'Giới thiệu nội dung tác phẩm']
+  "contributors" jsonb [not null]
+  "published_year" smallint
+  "rating_avg" numeric(3,2) [note: 'Cache điểm tác phẩm trung bình. Tính lại trong cùng transaction khi thêm, sửa, xóa, ẩn đánh giá']
+  "rating_count" integer [not null, default: 0]
+  "search_text" text [not null, note: 'Lưu search text, xây từ title || các trường trong json contributors']
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+
+  Indexes {
+    search_text [type: gin]
+  }
+  Note: '''Sách được xuất bản/phát hành. Do hiện tại đã không còn mô hình
+work - edition, mỗi cuồn sách sẽ thuộc hẳn về một nhà xuất bản/
+phát hành luôn.
+'''
+}
+
+Table "genres" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "name" varchar(100) [unique, not null, note: 'Ví dụ: Tiểu thuyết, Kỹ năng sống']
+  "slug" varchar(100) [unique, not null]
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+  Note: '''Danh mục thể loại, được tạo bởi admin.
+Được lấy từ những thể loại chung nhất, kiểu:
+- Văn học Việt Nam
+- Văn học nước ngoài
+- Truyện tranh
+- Kinh tế
+- Lịch sử
+- Tâm lý
+- Triết học
+- ...
+Có thể mail góp ý admin để admin thêm.
+'''
+}
+
+Table "book_genres" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "book_id" uuid [not null]
+  "genre_id" uuid [not null]
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (book_id, genre_id) [unique]
+  }
+  Note: 'Một tác phẩm thuộc nhiều thể loại.'
+}
+
+Table "book_reviews" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "user_id" uuid [not null]
+  "book_id" uuid [not null]
+  "rating" smallint [not null, note: 'Điểm tác phẩm 1–5, chỉ số nguyên']
+  "comment" text [note: 'Nội dung đánh giá, không bắt buộc']
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`, note: 'Khác created_at = đã chỉnh sửa (FR-21)']
+
+  Indexes {
+    (user_id, book_id) [unique]
+    id
+  }
+  Note: '''Điểm chấm cho sách. Nếu bị xóa thì mất luôn, không để hidden.
+Nếu bị xóa thì gửi mail cho người dùng, không được kháng cáo.
+'''
+}
+
+Table "surveys" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "publisher_id" uuid [not null]
+  "title" varchar(255) [not null]
+  "description" text
+  "starts_at" timestamptz [not null]
+  "ends_at" timestamptz [not null]
+  "survey_status" survey_status [not null, default: 'active', note: 'hidden/active. hidden có thể thực hiện ngay trong lúc đang survey']
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+
+  Indexes {
+    publisher_id
+    (starts_at, ends_at)
+  }
+  Note: 'Khảo sát do biên tập viên tạo. Đặt lịch start/end, chỉ sửa được nội dung trước khi start. Mọi kết quả đều chỉ nhà xuất bản xem được.'
+}
+
+Table "survey_questions" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "survey_id" uuid [not null]
+  "content" text [not null, note: 'Nội dung câu hỏi']
+  "position" smallint [not null, note: 'Thứ tự hiển thị']
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (survey_id, position)
+    (id, survey_id) [unique]
+  }
+  Note: 'Mỗi khảo sát có ít nhất 1 câu hỏi: kiểm tra ở tầng ứng dụng.'
+}
+
+Table "survey_options" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "question_id" uuid [not null]
+  "content" varchar(500) [not null, note: 'Nội dung lựa chọn. Nếu gắn tác phẩm thì mặc định là tên tác phẩm']
+  "position" smallint [not null]
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (question_id, position)
+    (id, question_id) [unique]
+  }
+  Note: 'Mỗi câu hỏi có ít nhất 2 option: kiểm tra ở tầng ứng dụng.'
+}
+
+Table "survey_votes" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "user_id" uuid [not null]
+  "question_id" uuid [not null]
+  "option_id" uuid [not null]
+  "created_at" timestamptz [not null, default: `now()`, note: 'Lần bỏ phiếu đầu']
+  "updated_at" timestamptz [not null, default: `now()`, note: 'Lần đổi phiếu gần nhất']
+
+  Indexes {
+    (user_id, question_id) [unique]
+  }
+  Note: '''Phiếu bầu (FR-47). Đổi phiếu = UPDATE option_id khi khảo sát còn mở.
+Bắt buộc trả lời hết: app ghi phiếu cho mọi câu hỏi trong một transaction,
+thiếu câu nào thì từ chối cả lần gửi.
+Số người tham gia = COUNT(DISTINCT user_id) theo survey_id.
+'''
+}
+
+Table "violation_reports" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "reporter_id" uuid [not null]
+  "target_type" report_target_type [not null, note: 'Loại nội dung bị báo cáo']
+  "target_id" uuid [not null, note: 'ID nội dung, KHÔNG phải FK. Bảng tùy theo target_type']
+  "description" text [note: 'Lí do báo cáo']
+  "status" report_status [not null, default: 'pending']
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+  Note: '''Reports: Những tài nguyên nào có thể bị report vì sai phạm?
+  - Review: Admin xử lý
+  - Sách: Editor xử lý
+'''
+}
+
+Table "system_logs" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "actor_id" uuid [not null]
+  "action_type" system_action_type [not null, note: 'Bảng này sẽ không thực sự có FK, nếu có nối thì dựa vào type ở đây']
+  "target_id" uuid [not null]
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+  Note: '''Logs: Những hành động nào có thể bị log lại?
+  - Độc giả:
+    - Đánh giá sách.
+        - Độc giả xem được.
+        - Nhà xuất bản xem được.
+  - Nhà xuất bản:
+    - Tạo biên tập viên.
+        - Nhà xuất bản xem được
+        - Biên tập viên xem được.
+  - Admin:
+    - Xóa review độc giả.
+        - Admin xem được
+        - Độc giả xem được
+    - Tạo admin khác
+      - Admin xem được
+    - Khóa account độc giả
+      - Admin xem được
+'''
+}
+
+Table "subscription_logs" {
+  "id" uuid [pk, default: `uuidv7()`]
+  "publisher_id" uuid [not null]
+  "subscription_tier" subscription_status [not null]
+  "expires_at" timestamptz [not null]
+  "created_at" timestamptz [not null, default: `now()`]
+  "updated_at" timestamptz [not null, default: `now()`]
+}
+
+Ref:"users"."id" <? "refresh_tokens"."user_id" [delete: cascade]
+
+Ref:"users"."id" <? "providers"."user_id"
+
+Ref:"users"."id" <? "publishers"."user_id"
+
+Ref:"users"."id" <? "editors"."user_id"
+
+Ref:"publishers"."id" <? "editors"."publisher_id"
+
+Ref:"publishers"."id" <? "books"."publisher_id"
+
+Ref:"books"."id" <? "book_genres"."book_id"
+
+Ref:"genres"."id" <? "book_genres"."genre_id"
+
+Ref:"users"."id" <? "book_reviews"."user_id"
+
+Ref:"books"."id" <? "book_reviews"."book_id"
+
+Ref:"publishers"."id" <? "surveys"."publisher_id"
+
+Ref:"surveys"."id" <? "survey_questions"."survey_id" [delete: cascade]
+
+Ref:"survey_questions"."id" <? "survey_options"."question_id" [delete: cascade]
+
+Ref:"users"."id" <? "survey_votes"."user_id"
+
+Ref:"survey_options".("id", "question_id") <? "survey_votes".("option_id", "question_id") [delete: cascade]
+
+Ref:"users"."id" <? "violation_reports"."reporter_id"
+
+Ref:"publishers"."id" <? "subscription_logs"."publisher_id"

@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_USER: bookstation
@@ -9,7 +9,7 @@ services:
     ports:
       - '127.0.0.1:5432:5432'
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
 
   redis:
     image: redis:7
