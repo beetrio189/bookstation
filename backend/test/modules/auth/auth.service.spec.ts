@@ -231,6 +231,7 @@ describe('AuthService', () => {
         );
         expect(jwtService.signAsync).toHaveBeenCalledWith({
           sub: USER.id,
+          notificationEmail: EMAIL,
           role: 'reader',
         });
         expect(refreshTokenService.create).toHaveBeenCalledWith(USER.id);
@@ -314,6 +315,7 @@ describe('AuthService', () => {
         expect(refreshTokenService.consume).toHaveBeenCalledWith('old');
         expect(jwtService.signAsync).toHaveBeenCalledWith({
           sub: USER.id,
+          notificationEmail: EMAIL,
           role: 'publisher',
         });
       });

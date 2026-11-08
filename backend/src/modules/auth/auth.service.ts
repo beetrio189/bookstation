@@ -200,7 +200,11 @@ export class AuthService {
   }
 
   private async issueTokens(user: User) {
-    const payload: JwtPayload = { sub: user.id, role: user.role };
+    const payload: JwtPayload = {
+      sub: user.id,
+      notificationEmail: user.notificationEmail,
+      role: user.role,
+    };
 
     return {
       accessToken: await this.jwtService.signAsync(payload),

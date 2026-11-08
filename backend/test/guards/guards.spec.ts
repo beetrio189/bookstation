@@ -47,6 +47,7 @@ class StaffController {
 
 const payloadFor = (id: string, role: RoleCode): JwtPayload => ({
   sub: id,
+  notificationEmail: `${id}@example.com`,
   role,
 });
 
@@ -124,7 +125,13 @@ describe('JwtAuthGuard + RolesGuard', () => {
   it('exposes the token claims through @CurrentUser()', async () => {
     await get('/test/me', jwt.sign(EDITOR))
       .expect(200)
-      .expect({ data: { id: 'editor', role: 'editor' } });
+      .expect({
+        data: {
+          id: 'editor',
+          notificationEmail: 'editor@example.com',
+          role: 'editor',
+        },
+      });
   });
 
   it('applies @Roles() on a route', async () => {
