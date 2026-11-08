@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
+import { IdentityProvider } from '../../utils/enums/identity-provider.enum';
 import { RoleCode } from '../../utils/enums/role-code.enum';
-import { Role } from './entities/role.entity';
-import { UserRole } from './entities/user-role.entity';
+import { Provider } from './entities/provider.entity';
 import { User } from './entities/user.entity';
 
 @Injectable()
@@ -11,66 +11,85 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Provider)
+    private readonly providersRepository: Repository<Provider>,
   ) {}
 
-  findByIdWithRoles(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({
-      where: { id },
-      relations: { userRoles: { role: true } },
+  findById(id: string): Promise<User | null> {
+    return this.usersRepository.findOneBy({ id });
+  }
+
+  findLocalProvider(email: string): Promise<Provider | null> {
+    return this.providersRepository.findOne({
+      where: { provider: IdentityProvider.LOCAL, providerKey: email },
+      relations: { user: true },
     });
   }
 
-  findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOneBy({ email });
-  }
-
-  findByEmailForLogin(email: string): Promise<User | null> {
-    return this.usersRepository
-      .createQueryBuilder('user')
-      .addSelect('user.passwordHash')
-      .leftJoinAndSelect('user.userRoles', 'userRole')
-      .leftJoinAndSelect('userRole.role', 'role')
-      .where('user.email = :email', { email })
+  findLocalProviderForLogin(email: string): Promise<Provider | null> {
+    return this.providersRepository
+      .createQueryBuilder('provider')
+      .addSelect('provider.passwordHash')
+      .innerJoinAndSelect('provider.user', 'user')
+      .where('provider.provider = :provider', {
+        provider: IdentityProvider.LOCAL,
+      })
+      .andWhere('provider.providerKey = :email', { email })
       .getOne();
   }
 
-  findByIdWithPassword(id: string): Promise<User | null> {
-    return this.usersRepository
-      .createQueryBuilder('user')
-      .addSelect('user.passwordHash')
-      .where('user.id = :id', { id })
+  findLocalProviderWithPassword(userId: string): Promise<Provider | null> {
+    return this.providersRepository
+      .createQueryBuilder('provider')
+      .addSelect('provider.passwordHash')
+      .where('provider.provider = :provider', {
+        provider: IdentityProvider.LOCAL,
+      })
+      .andWhere('provider.userId = :userId', { userId })
       .getOne();
   }
 
   createReader(data: {
     email: string;
     passwordHash: string;
-    displayName: string;
+    name: string;
   }): Promise<User> {
     return this.usersRepository.manager.transaction(async (manager) => {
-      const role = await manager.findOneByOrFail(Role, {
-        code: RoleCode.READER,
-      });
-      const user = await manager.save(manager.create(User, data));
+      const user = await manager.save(
+        manager.create(User, {
+          role: RoleCode.READER,
+          name: data.name,
+          notificationEmail: data.email,
+          notificationEmailVerified: true,
+        }),
+      );
 
-      await manager.insert(UserRole, { userId: user.id, roleId: role.id });
+      await manager.insert(Provider, {
+        userId: user.id,
+        provider: IdentityProvider.LOCAL,
+        providerKey: data.email,
+        passwordHash: data.passwordHash,
+        verified: false,
+      });
 
       return user;
     });
   }
 
-  async markEmailVerified(id: string): Promise<void> {
-    await this.usersRepository.update(
-      { id, emailVerifiedAt: IsNull() },
-      { emailVerifiedAt: new Date() },
+  async markLocalVerified(userId: string): Promise<void> {
+    await this.providersRepository.update(
+      { userId, provider: IdentityProvider.LOCAL },
+      { verified: true },
     );
   }
 
-  async updatePassword(id: string, passwordHash: string): Promise<void> {
-    await this.usersRepository.update({ id }, { passwordHash });
-  }
-
-  async updateLastLogin(id: string): Promise<void> {
-    await this.usersRepository.update({ id }, { lastLoginAt: new Date() });
+  async updateLocalPassword(
+    userId: string,
+    passwordHash: string,
+  ): Promise<void> {
+    await this.providersRepository.update(
+      { userId, provider: IdentityProvider.LOCAL },
+      { passwordHash },
+    );
   }
 }

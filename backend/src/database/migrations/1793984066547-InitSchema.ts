@@ -60,8 +60,13 @@ CREATE TYPE "system_action_type" AS ENUM (
   'editor_creation',
   'review_deletion',
   'admin_creation',
-  'reader_lock'
+  'reader_lock',
+  'book_creation',
+  'book_update',
+  'book_deletion'
 );
+
+/* Bảng */
 
 CREATE TABLE "users" (
   "id" uuid PRIMARY KEY DEFAULT (uuidv7()),
@@ -166,33 +171,16 @@ CREATE TABLE "surveys" (
   "starts_at" timestamptz NOT NULL,
   "ends_at" timestamptz NOT NULL,
   "survey_status" survey_status NOT NULL DEFAULT 'active',
+  "survey_content" jsonb NOT NULL,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
 
-CREATE TABLE "survey_questions" (
-  "id" uuid PRIMARY KEY DEFAULT (uuidv7()),
-  "survey_id" uuid NOT NULL,
-  "content" text NOT NULL,
-  "position" smallint NOT NULL,
-  "created_at" timestamptz NOT NULL DEFAULT (now()),
-  "updated_at" timestamptz NOT NULL DEFAULT (now())
-);
-
-CREATE TABLE "survey_options" (
-  "id" uuid PRIMARY KEY DEFAULT (uuidv7()),
-  "question_id" uuid NOT NULL,
-  "content" varchar(500) NOT NULL,
-  "position" smallint NOT NULL,
-  "created_at" timestamptz NOT NULL DEFAULT (now()),
-  "updated_at" timestamptz NOT NULL DEFAULT (now())
-);
-
-CREATE TABLE "survey_votes" (
+CREATE TABLE "survey_answers" (
   "id" uuid PRIMARY KEY DEFAULT (uuidv7()),
   "user_id" uuid NOT NULL,
-  "question_id" uuid NOT NULL,
-  "option_id" uuid NOT NULL,
+  "survey_id" uuid NOT NULL,
+  "survey_answer_content" jsonb NOT NULL,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
@@ -249,16 +237,6 @@ CREATE INDEX ON "book_reviews" ("id");
 CREATE INDEX ON "surveys" ("publisher_id");
 
 CREATE INDEX ON "surveys" ("starts_at", "ends_at");
-
-CREATE INDEX ON "survey_questions" ("survey_id", "position");
-
-CREATE UNIQUE INDEX ON "survey_questions" ("id", "survey_id");
-
-CREATE INDEX ON "survey_options" ("question_id", "position");
-
-CREATE UNIQUE INDEX ON "survey_options" ("id", "question_id");
-
-CREATE UNIQUE INDEX ON "survey_votes" ("user_id", "question_id");
 
 COMMENT ON TABLE "users" IS 'Bảng người dùng.';
 
@@ -345,15 +323,15 @@ COMMENT ON TABLE "surveys" IS 'Khảo sát do biên tập viên tạo. Đặt l�
 
 COMMENT ON COLUMN "surveys"."survey_status" IS 'hidden/active. hidden có thể thực hiện ngay trong lúc đang survey';
 
-COMMENT ON TABLE "survey_questions" IS 'Mỗi khảo sát có ít nhất 1 câu hỏi: kiểm tra ở tầng ứng dụng.';
+COMMENT ON COLUMN "surveys"."survey_content" IS 'câu hỏi dưới dạng json';
 
-COMMENT ON COLUMN "survey_questions"."content" IS 'Nội dung câu hỏi';
+COMMENT ON TABLE "survey_answers" IS 'Phiếu bầu của người dùng.';
 
-COMMENT ON COLUMN "survey_questions"."position" IS 'Thứ tự hiển thị';
+COMMENT ON COLUMN "survey_answers"."survey_answer_content" IS 'câu trả lời của người dùng dưới dạng json';
 
-COMMENT ON TABLE "survey_options" IS 'Mỗi câu hỏi có ít nhất 2 option: kiểm tra ở tầng ứng dụng.';
+COMMENT ON COLUMN "survey_answers"."created_at" IS 'Lần bỏ phiếu đầu';
 
-COMMENT ON COLUMN "survey_options"."content" IS 'Nội dung lựa chọn. Nếu gắn tác phẩm thì mặc định là tên tác phẩm';
+COMMENT ON COLUMN "survey_answers"."updated_at" IS 'Lần đổi phiếu gần nhất';
 
 COMMENT ON TABLE "violation_reports" IS 'Reports: Những tài nguyên nào có thể bị report vì sai phạm?
   - Review: Admin xử lý
@@ -409,13 +387,9 @@ ALTER TABLE "book_reviews" ADD FOREIGN KEY ("book_id") REFERENCES "books" ("id")
 
 ALTER TABLE "surveys" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "survey_questions" ADD FOREIGN KEY ("survey_id") REFERENCES "surveys" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "survey_answers" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "survey_options" ADD FOREIGN KEY ("question_id") REFERENCES "survey_questions" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE "survey_votes" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
-
-ALTER TABLE "survey_votes" ADD FOREIGN KEY ("option_id", "question_id") REFERENCES "survey_options" ("id", "question_id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "survey_answers" ADD FOREIGN KEY ("survey_id") REFERENCES "surveys" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "violation_reports" ADD FOREIGN KEY ("reporter_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 

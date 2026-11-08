@@ -6,27 +6,34 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { UserRole } from './user-role.entity';
+import { RoleCode } from '../../../utils/enums/role-code.enum';
+import { UserStatus } from '../../../utils/enums/user-status.enum';
+import { Provider } from './provider.entity';
 
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 255, unique: true })
-  email: string;
+  @Column({ type: 'enum', enum: RoleCode, enumName: 'role' })
+  role: RoleCode;
 
   @Column({
-    name: 'password_hash',
-    type: 'varchar',
-    length: 255,
-    nullable: true,
-    select: false,
+    type: 'enum',
+    enum: UserStatus,
+    enumName: 'user_status',
+    default: UserStatus.ACTIVE,
   })
-  passwordHash: string | null;
+  status: UserStatus;
 
-  @Column({ name: 'display_name', type: 'varchar', length: 100 })
-  displayName: string;
+  @Column({ type: 'varchar', length: 100 })
+  name: string;
+
+  @Column({ name: 'notification_email', type: 'varchar', length: 255 })
+  notificationEmail: string;
+
+  @Column({ name: 'notification_email_verified', type: 'boolean' })
+  notificationEmailVerified: boolean;
 
   @Column({ name: 'avatar_url', type: 'text', nullable: true })
   avatarUrl: string | null;
@@ -34,27 +41,12 @@ export class User {
   @Column({ type: 'text', nullable: true })
   bio: string | null;
 
-  @Column({ name: 'email_verified_at', type: 'timestamptz', nullable: true })
-  emailVerifiedAt: Date | null;
-
-  @Column({ name: 'locked_at', type: 'timestamptz', nullable: true })
-  lockedAt: Date | null;
-
-  @Column({ name: 'locked_reason', type: 'text', nullable: true })
-  lockedReason: string | null;
-
-  @Column({ name: 'locked_by', type: 'uuid', nullable: true })
-  lockedBy: string | null;
-
-  @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
-  lastLoginAt: Date | null;
-
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
-  @OneToMany(() => UserRole, (userRole) => userRole.user)
-  userRoles: UserRole[];
+  @OneToMany(() => Provider, (provider) => provider.user)
+  providers: Provider[];
 }

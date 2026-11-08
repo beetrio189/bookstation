@@ -36,7 +36,7 @@ class TestController {
   }
 }
 
-@Roles(RoleCode.LIBRARIAN, RoleCode.ADMIN)
+@Roles(RoleCode.EDITOR, RoleCode.ADMIN)
 @Controller('staff')
 class StaffController {
   @Get()
@@ -45,18 +45,14 @@ class StaffController {
   }
 }
 
-const payloadFor = (id: string, roles: RoleCode[]): JwtPayload => ({
+const payloadFor = (id: string, role: RoleCode): JwtPayload => ({
   sub: id,
-  email: `${id}@example.com`,
-  roles,
+  role,
 });
 
-const READER = payloadFor('reader', [RoleCode.READER]);
-const LIBRARIAN = payloadFor('librarian', [
-  RoleCode.READER,
-  RoleCode.LIBRARIAN,
-]);
-const ADMIN = payloadFor('admin', [RoleCode.ADMIN]);
+const READER = payloadFor('reader', RoleCode.READER);
+const EDITOR = payloadFor('editor', RoleCode.EDITOR);
+const ADMIN = payloadFor('admin', RoleCode.ADMIN);
 
 describe('JwtAuthGuard + RolesGuard', () => {
   let app: INestApplication;
@@ -126,15 +122,9 @@ describe('JwtAuthGuard + RolesGuard', () => {
   });
 
   it('exposes the token claims through @CurrentUser()', async () => {
-    await get('/test/me', jwt.sign(LIBRARIAN))
+    await get('/test/me', jwt.sign(EDITOR))
       .expect(200)
-      .expect({
-        data: {
-          id: 'librarian',
-          email: 'librarian@example.com',
-          roles: ['reader', 'librarian'],
-        },
-      });
+      .expect({ data: { id: 'editor', role: 'editor' } });
   });
 
   it('applies @Roles() on a route', async () => {
@@ -151,7 +141,7 @@ describe('JwtAuthGuard + RolesGuard', () => {
 
   it('applies @Roles() on a controller and accepts any listed role', async () => {
     await get('/staff', jwt.sign(READER)).expect(403);
-    await get('/staff', jwt.sign(LIBRARIAN)).expect(200);
+    await get('/staff', jwt.sign(EDITOR)).expect(200);
     await get('/staff', jwt.sign(ADMIN)).expect(200);
   });
 });

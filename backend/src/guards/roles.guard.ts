@@ -29,7 +29,7 @@ export class RolesGuard implements CanActivate {
       throw new AppException(ERRORS.UNAUTHENTICATED);
     }
 
-    if (!requiredRoles.some((role) => user.roles.includes(role))) {
+    if (!requiredRoles.includes(user.role)) {
       throw new AppException(ERRORS.FORBIDDEN);
     }
 

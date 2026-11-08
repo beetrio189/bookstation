@@ -16,5 +16,5 @@ export class RegisterDto {
   @MaxLength(100, { message: 'Tên hiển thị quá dài' })
   @IsNotEmpty({ message: 'Tên hiển thị không được để trống' })
   @IsString({ message: 'Tên hiển thị không hợp lệ' })
-  displayName: string;
+  name: string;
 }

@@ -1,9 +1,9 @@
 import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 import dataSource from '../../libs/typeorm.config';
-import { Role } from '../../modules/users/entities/role.entity';
-import { UserRole } from '../../modules/users/entities/user-role.entity';
+import { Provider } from '../../modules/users/entities/provider.entity';
 import { User } from '../../modules/users/entities/user.entity';
+import { IdentityProvider } from '../../utils/enums/identity-provider.enum';
 import { RoleCode } from '../../utils/enums/role-code.enum';
 import { hashPassword, isPasswordWithinLimit } from '../../utils/password';
 
@@ -22,33 +22,34 @@ async function seedAdmin() {
 
   try {
     await dataSource.transaction(async (manager) => {
-      const role = await manager.findOneBy(Role, { code: RoleCode.ADMIN });
+      const existing = await manager.findOneBy(Provider, {
+        provider: IdentityProvider.LOCAL,
+        providerKey: admin.ADMIN_EMAIL,
+      });
 
-      if (!role) {
-        throw new Error('Role admin not found, run the migrations first');
+      if (existing) {
+        logger.warn(`Account ${admin.ADMIN_EMAIL} already exists, unchanged`);
+        return;
       }
 
-      let user = await manager.findOneBy(User, { email: admin.ADMIN_EMAIL });
+      const user = await manager.save(
+        manager.create(User, {
+          role: RoleCode.ADMIN,
+          name: admin.ADMIN_DISPLAY_NAME,
+          notificationEmail: admin.ADMIN_EMAIL,
+          notificationEmailVerified: true,
+        }),
+      );
 
-      if (user) {
-        logger.warn(`User ${user.email} already exists, password unchanged`);
-      } else {
-        user = await manager.save(
-          manager.create(User, {
-            email: admin.ADMIN_EMAIL,
-            passwordHash: await hashPassword(admin.ADMIN_PASSWORD),
-            displayName: admin.ADMIN_DISPLAY_NAME,
-            emailVerifiedAt: new Date(),
-          }),
-        );
-      }
+      await manager.insert(Provider, {
+        userId: user.id,
+        provider: IdentityProvider.LOCAL,
+        providerKey: admin.ADMIN_EMAIL,
+        passwordHash: await hashPassword(admin.ADMIN_PASSWORD),
+        verified: true,
+      });
 
-      await manager.upsert(UserRole, { userId: user.id, roleId: role.id }, [
-        'userId',
-        'roleId',
-      ]);
-
-      logger.log(`User ${user.email} has the admin role`);
+      logger.log(`Created admin ${admin.ADMIN_EMAIL}`);
     });
   } finally {
     await dataSource.destroy();

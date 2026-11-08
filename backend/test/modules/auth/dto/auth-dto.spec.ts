@@ -14,7 +14,7 @@ const pipe = new ValidationPipe({
 const VALID = {
   email: 'a@example.com',
   password: 'mat-khau-dai',
-  displayName: 'Wing',
+  name: 'Wing',
 };
 const validate = (metatype: new () => object, value: object) =>
   pipe.transform(value, { type: 'body', metatype });
@@ -25,12 +25,12 @@ describe('auth DTOs', () => {
       validate(RegisterDto, {
         ...VALID,
         email: '  A@Example.COM ',
-        displayName: '  Wing  ',
+        name: '  Wing  ',
       }),
     ).resolves.toEqual({
       ...VALID,
       email: 'a@example.com',
-      displayName: 'Wing',
+      name: 'Wing',
     });
   });
 
@@ -58,17 +58,17 @@ describe('auth DTOs', () => {
     ['a 75-byte password', { password: 'ệ'.repeat(25) }, 'Mật khẩu quá dài'],
     [
       'a blank display name',
-      { displayName: '   ' },
+      { name: '   ' },
       'Tên hiển thị không được để trống',
     ],
     [
       'a missing display name',
-      { displayName: undefined },
+      { name: undefined },
       'Tên hiển thị không hợp lệ',
     ],
     [
       'a too long display name',
-      { displayName: 'a'.repeat(101) },
+      { name: 'a'.repeat(101) },
       'Tên hiển thị quá dài',
     ],
   ])('rejects %s', async (_case, override, message) => {
