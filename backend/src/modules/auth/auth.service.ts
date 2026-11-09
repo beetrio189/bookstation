@@ -155,12 +155,33 @@ export class AuthService {
   }
 
   async resetPassword({ token, newPassword }: ResetPasswordDto): Promise<void> {
-    const userId = await this.oneTimeTokenService.consume(
+    // Chỉ xem trước, để nhập trùng mật khẩu cũ thì vẫn dùng lại được link
+    const userId = await this.oneTimeTokenService.peek(
       OneTimeTokenPurpose.RESET_PASSWORD,
       token,
     );
 
     if (!userId) {
+      throw new AppException(ERRORS.INVALID_TOKEN);
+    }
+
+    const provider =
+      await this.usersService.findLocalProviderWithPassword(userId);
+
+    if (
+      provider?.passwordHash &&
+      (await verifyPassword(provider.passwordHash, newPassword))
+    ) {
+      throw new AppException(ERRORS.SAME_PASSWORD);
+    }
+
+    // Hai request cùng lúc với một token thì chỉ một request được đi tiếp
+    const consumedUserId = await this.oneTimeTokenService.consume(
+      OneTimeTokenPurpose.RESET_PASSWORD,
+      token,
+    );
+
+    if (consumedUserId !== userId) {
       throw new AppException(ERRORS.INVALID_TOKEN);
     }
 
@@ -175,6 +196,10 @@ export class AuthService {
     userId: string,
     { currentPassword, newPassword }: ChangePasswordDto,
   ): Promise<void> {
+    if (newPassword === currentPassword) {
+      throw new AppException(ERRORS.SAME_PASSWORD);
+    }
+
     const provider =
       await this.usersService.findLocalProviderWithPassword(userId);
 
@@ -246,7 +271,8 @@ export class AuthService {
         avatarUrl: picture ?? null,
       });
     } catch (error) {
-      if (isUniqueViolation(error)) { // vi phạm unique (provider, provider_key)
+      if (isUniqueViolation(error)) {
+        // vi phạm unique (provider, provider_key)
         throw new AppException(ERRORS.GOOGLE_AUTH_FAILED);
       }
 

@@ -27,6 +27,11 @@ export class OneTimeTokenService {
     return token;
   }
 
+  // Xem token còn hiệu lực không, chưa xóa
+  peek(purpose: OneTimeTokenPurpose, token: string): Promise<string | null> {
+    return this.redis.get(buildKey(purpose, token));
+  }
+
   consume(purpose: OneTimeTokenPurpose, token: string): Promise<string | null> {
     return this.redis.getdel(buildKey(purpose, token));
   }

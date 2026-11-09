@@ -49,7 +49,11 @@ describe('AuthService', () => {
     sendVerificationEmail: jest.fn(),
     sendPasswordResetEmail: jest.fn(),
   };
-  const oneTimeTokenService = { create: jest.fn(), consume: jest.fn() };
+  const oneTimeTokenService = {
+    create: jest.fn(),
+    peek: jest.fn(),
+    consume: jest.fn(),
+  };
   const refreshTokenService = {
     create: jest.fn(),
     consume: jest.fn(),
@@ -579,11 +583,21 @@ describe('AuthService', () => {
     });
 
     describe('resetPassword', () => {
-      it('sets the password and revokes all sessions', async () => {
+      beforeEach(async () => {
+        oneTimeTokenService.peek.mockResolvedValue(USER.id);
         oneTimeTokenService.consume.mockResolvedValue(USER.id);
+        usersService.findLocalProviderWithPassword.mockResolvedValue({
+          ...PROVIDER,
+          passwordHash: await hashPassword(CURRENT),
+        });
+      });
 
+      it('sets the password and revokes all sessions', async () => {
         await service.resetPassword({ token: 'token-1', newPassword: NEW });
 
+        expect(usersService.findLocalProviderWithPassword).toHaveBeenCalledWith(
+          USER.id,
+        );
         expect(oneTimeTokenService.consume).toHaveBeenCalledWith(
           OneTimeTokenPurpose.RESET_PASSWORD,
           'token-1',
@@ -594,13 +608,31 @@ describe('AuthService', () => {
       });
 
       it('rejects an invalid or used token and changes nothing', async () => {
-        oneTimeTokenService.consume.mockResolvedValue(null);
+        oneTimeTokenService.peek.mockResolvedValue(null);
 
         await expect(
           service.resetPassword({ token: 'bad', newPassword: NEW }),
         ).rejects.toMatchObject({ code: 2004 });
+        expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
         expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
         expect(refreshTokenService.revokeAll).not.toHaveBeenCalled();
+      });
+
+      it('rejects the current password and keeps the token usable', async () => {
+        await expect(
+          service.resetPassword({ token: 'token-1', newPassword: CURRENT }),
+        ).rejects.toMatchObject({ code: 2008 });
+        expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
+        expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
+      });
+
+      it('lets only one of two concurrent requests through', async () => {
+        oneTimeTokenService.consume.mockResolvedValue(null);
+
+        await expect(
+          service.resetPassword({ token: 'token-1', newPassword: NEW }),
+        ).rejects.toMatchObject({ code: 2004 });
+        expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
       });
     });
 
@@ -637,6 +669,19 @@ describe('AuthService', () => {
         ).rejects.toMatchObject({ code: 2005 });
         expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
         expect(refreshTokenService.revokeAll).not.toHaveBeenCalled();
+      });
+
+      it('rejects a new password equal to the current one before any lookup', async () => {
+        await expect(
+          service.changePassword(USER.id, {
+            currentPassword: CURRENT,
+            newPassword: CURRENT,
+          }),
+        ).rejects.toMatchObject({ code: 2008 });
+        expect(
+          usersService.findLocalProviderWithPassword,
+        ).not.toHaveBeenCalled();
+        expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
       });
 
       it('rejects a current password that matches only in its first 72 bytes', async () => {

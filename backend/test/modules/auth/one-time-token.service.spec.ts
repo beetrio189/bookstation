@@ -15,7 +15,12 @@ describe('OneTimeTokenService', () => {
     store.delete(key);
     return Promise.resolve(value);
   });
-  const service = new OneTimeTokenService({ set, getdel } as unknown as Redis);
+  const get = jest.fn((key: string) => Promise.resolve(store.get(key) ?? null));
+  const service = new OneTimeTokenService({
+    set,
+    get,
+    getdel,
+  } as unknown as Redis);
   const purpose = OneTimeTokenPurpose.VERIFY_EMAIL;
 
   beforeEach(() => {
@@ -37,6 +42,15 @@ describe('OneTimeTokenService', () => {
 
     await expect(service.consume(purpose, token)).resolves.toBe('user-1');
     await expect(service.consume(purpose, token)).resolves.toBeNull();
+  });
+
+  it('peeks without using the token up', async () => {
+    const token = await service.create(purpose, 'user-1', 60);
+
+    await expect(service.peek(purpose, token)).resolves.toBe('user-1');
+    await expect(service.peek(purpose, token)).resolves.toBe('user-1');
+    await expect(service.consume(purpose, token)).resolves.toBe('user-1');
+    await expect(service.peek(purpose, token)).resolves.toBeNull();
   });
 
   it('rejects an unknown token', async () => {

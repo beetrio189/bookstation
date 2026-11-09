@@ -85,4 +85,9 @@ export const ERRORS = {
     status: HttpStatus.UNAUTHORIZED,
     message: 'Đăng nhập Google không thành công, vui lòng thử lại',
   },
+  SAME_PASSWORD: {
+    code: 2008,
+    status: HttpStatus.BAD_REQUEST,
+    message: 'Mật khẩu mới phải khác với mật khẩu đã sử dụng trước đó',
+  },
 } as const satisfies Record<string, ErrorDefinition>;
