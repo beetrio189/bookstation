@@ -18,6 +18,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { GoogleOAuthService, GoogleProfile } from './google-oauth.service';
 import {
   OneTimeTokenPurpose,
   OneTimeTokenService,
@@ -27,6 +28,7 @@ import { RefreshTokenService } from './refresh-token.service';
 const VERIFY_EMAIL_TTL_SECONDS = 24 * 60 * 60;
 const RESET_PASSWORD_TTL_SECONDS = 30 * 60;
 const POSTGRES_UNIQUE_VIOLATION = '23505';
+const MAX_NAME_LENGTH = 100;
 
 const isLocked = (user: User): boolean => user.status === UserStatus.LOCKED;
 
@@ -44,6 +46,7 @@ export class AuthService {
     private readonly oneTimeTokenService: OneTimeTokenService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly jwtService: JwtService,
+    private readonly googleOAuthService: GoogleOAuthService,
   ) {}
 
   async register({ email, password, name }: RegisterDto) {
@@ -108,6 +111,17 @@ export class AuthService {
     }
 
     return this.issueTokens(provider.user);
+  }
+
+  async loginWithGoogle(code: string) {
+    const profile = await this.googleOAuthService.getProfile(code);
+    const user = await this.findOrCreateGoogleUser(profile);
+
+    if (isLocked(user)) {
+      throw new AppException(ERRORS.ACCOUNT_LOCKED);
+    }
+
+    return this.issueTokens(user);
   }
 
   async refresh(refreshToken: string | undefined) {
@@ -210,6 +224,34 @@ export class AuthService {
       accessToken: await this.jwtService.signAsync(payload),
       refreshToken: await this.refreshTokenService.create(user.id),
     };
+  }
+
+  private async findOrCreateGoogleUser({
+    sub,
+    email,
+    name,
+    picture,
+  }: GoogleProfile): Promise<User> {
+    const googleProvider = await this.usersService.findGoogleProvider(sub);
+
+    if (googleProvider) {
+      return googleProvider.user;
+    }
+
+    try {
+      return await this.usersService.createGoogleReader({
+        sub,
+        email,
+        name: (name?.trim() || email.split('@')[0]).slice(0, MAX_NAME_LENGTH),
+        avatarUrl: picture ?? null,
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) { // vi phạm unique (provider, provider_key)
+        throw new AppException(ERRORS.GOOGLE_AUTH_FAILED);
+      }
+
+      throw error;
+    }
   }
 
   private async createReader(

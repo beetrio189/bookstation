@@ -80,4 +80,9 @@ export const ERRORS = {
     message:
       'Tài khoản chưa có mật khẩu, vui lòng dùng chức năng quên mật khẩu để tạo',
   },
+  GOOGLE_AUTH_FAILED: {
+    code: 2007,
+    status: HttpStatus.UNAUTHORIZED,
+    message: 'Đăng nhập Google không thành công, vui lòng thử lại',
+  },
 } as const satisfies Record<string, ErrorDefinition>;

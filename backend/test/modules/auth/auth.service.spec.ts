@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from '../../../src/utils/password';
 import { MailService } from '../../../src/modules/mail/mail.service';
 import { UsersService } from '../../../src/modules/users/users.service';
 import { AuthService } from '../../../src/modules/auth/auth.service';
+import { GoogleOAuthService } from '../../../src/modules/auth/google-oauth.service';
 import {
   OneTimeTokenPurpose,
   OneTimeTokenService,
@@ -40,7 +41,10 @@ describe('AuthService', () => {
     createReader: jest.fn(),
     markLocalVerified: jest.fn(),
     updateLocalPassword: jest.fn(),
+    findGoogleProvider: jest.fn(),
+    createGoogleReader: jest.fn(),
   };
+  const googleOAuthService = { getProfile: jest.fn() };
   const mailService = {
     sendVerificationEmail: jest.fn(),
     sendPasswordResetEmail: jest.fn(),
@@ -58,6 +62,7 @@ describe('AuthService', () => {
     oneTimeTokenService as unknown as OneTimeTokenService,
     refreshTokenService as unknown as RefreshTokenService,
     jwtService as unknown as JwtService,
+    googleOAuthService as unknown as GoogleOAuthService,
   );
   const flushPromises = () => new Promise(setImmediate);
 
@@ -299,6 +304,118 @@ describe('AuthService', () => {
         await expect(service.login(LOGIN)).rejects.toMatchObject({
           code: 2003,
         });
+      });
+    });
+
+    describe('loginWithGoogle', () => {
+      const PROFILE = {
+        sub: 'google-sub-1',
+        email: EMAIL,
+        name: 'Wing Google',
+        picture: 'https://example.com/a.png',
+      };
+
+      beforeEach(() => {
+        googleOAuthService.getProfile.mockResolvedValue(PROFILE);
+        usersService.findGoogleProvider.mockResolvedValue(null);
+      });
+
+      it('logs in a user already linked to the Google account', async () => {
+        usersService.findGoogleProvider.mockResolvedValue({ user: USER });
+
+        await expect(service.loginWithGoogle('code-1')).resolves.toEqual(
+          TOKENS,
+        );
+        expect(googleOAuthService.getProfile).toHaveBeenCalledWith('code-1');
+        expect(usersService.findGoogleProvider).toHaveBeenCalledWith(
+          PROFILE.sub,
+        );
+        expect(jwtService.signAsync).toHaveBeenCalledWith({
+          sub: USER.id,
+          notificationEmail: EMAIL,
+          role: 'reader',
+        });
+        expect(usersService.createGoogleReader).not.toHaveBeenCalled();
+      });
+
+      it('creates a new reader even when a local account has the same email', async () => {
+        usersService.findLocalProvider.mockResolvedValue(PROVIDER);
+        usersService.createGoogleReader.mockResolvedValue({
+          ...USER,
+          id: 'user-2',
+        });
+
+        await expect(service.loginWithGoogle('code-1')).resolves.toEqual(
+          TOKENS,
+        );
+        expect(usersService.createGoogleReader).toHaveBeenCalledWith({
+          sub: PROFILE.sub,
+          email: EMAIL,
+          name: PROFILE.name,
+          avatarUrl: PROFILE.picture,
+        });
+        expect(usersService.findLocalProvider).not.toHaveBeenCalled();
+        expect(refreshTokenService.create).toHaveBeenCalledWith('user-2');
+      });
+
+      it('falls back to the email name and trims long names', async () => {
+        usersService.createGoogleReader.mockResolvedValue(USER);
+        googleOAuthService.getProfile.mockResolvedValueOnce({
+          ...PROFILE,
+          name: undefined,
+          picture: undefined,
+        });
+
+        await service.loginWithGoogle('code-1');
+
+        expect(usersService.createGoogleReader).toHaveBeenLastCalledWith(
+          expect.objectContaining({ name: 'a', avatarUrl: null }),
+        );
+
+        googleOAuthService.getProfile.mockResolvedValueOnce({
+          ...PROFILE,
+          name: 'x'.repeat(150),
+        });
+
+        await service.loginWithGoogle('code-1');
+
+        expect(usersService.createGoogleReader).toHaveBeenLastCalledWith(
+          expect.objectContaining({ name: 'x'.repeat(100) }),
+        );
+      });
+
+      it('rejects a locked account already linked to Google', async () => {
+        usersService.findGoogleProvider.mockResolvedValue({
+          user: LOCKED_USER,
+        });
+
+        await expect(service.loginWithGoogle('code-1')).rejects.toMatchObject({
+          code: 2003,
+        });
+        expect(refreshTokenService.create).not.toHaveBeenCalled();
+      });
+
+      it('fails when two callbacks create the same Google account', async () => {
+        usersService.createGoogleReader.mockRejectedValue(
+          new QueryFailedError('INSERT', [], {
+            code: '23505',
+          } as unknown as Error),
+        );
+
+        await expect(service.loginWithGoogle('code-1')).rejects.toMatchObject({
+          code: 2007,
+        });
+      });
+
+      it('passes on a failed Google exchange', async () => {
+        googleOAuthService.getProfile.mockRejectedValue(
+          Object.assign(new Error('bad'), { code: 2007 }),
+        );
+
+        await expect(service.loginWithGoogle('code-1')).rejects.toMatchObject({
+          code: 2007,
+        });
+        expect(usersService.findGoogleProvider).not.toHaveBeenCalled();
       });
     });
 

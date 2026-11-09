@@ -76,6 +76,41 @@ export class UsersService {
     });
   }
 
+  findGoogleProvider(sub: string): Promise<Provider | null> {
+    return this.providersRepository.findOne({
+      where: { provider: IdentityProvider.GOOGLE, providerKey: sub },
+      relations: { user: true },
+    });
+  }
+
+  createGoogleReader(data: {
+    sub: string;
+    email: string;
+    name: string;
+    avatarUrl: string | null;
+  }): Promise<User> {
+    return this.usersRepository.manager.transaction(async (manager) => {
+      const user = await manager.save(
+        manager.create(User, {
+          role: RoleCode.READER,
+          name: data.name,
+          notificationEmail: data.email,
+          notificationEmailVerified: true,
+          avatarUrl: data.avatarUrl,
+        }),
+      );
+
+      await manager.insert(Provider, {
+        userId: user.id,
+        provider: IdentityProvider.GOOGLE,
+        providerKey: data.sub,
+        verified: true,
+      });
+
+      return user;
+    });
+  }
+
   async markLocalVerified(userId: string): Promise<void> {
     await this.providersRepository.update(
       { userId, provider: IdentityProvider.LOCAL },

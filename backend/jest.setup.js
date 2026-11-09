@@ -7,4 +7,7 @@ Object.assign(process.env, {
   JWT_SECRET: 'test-secret-that-is-at-least-32-chars',
   RESEND_API_KEY: '',
   MAIL_FROM: 'BookStation <no-reply@example.com>',
+  GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
+  GOOGLE_CLIENT_SECRET: 'test-client-secret',
+  GOOGLE_REDIRECT_URI: 'http://localhost:8080/api/auth/google/callback',
 });
