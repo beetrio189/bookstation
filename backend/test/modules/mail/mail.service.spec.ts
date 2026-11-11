@@ -17,21 +17,29 @@ describe('MailService', () => {
   it('logs the link instead of sending when there is no API key', async () => {
     const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
 
-    await new MailService().sendVerificationEmail('a@example.com', 'abc-123');
+    await new MailService().sendVerificationEmail(
+      'a@example.com',
+      'user-1',
+      'abc-123',
+    );
 
     expect(send).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
-      'Email to a@example.com: http://localhost:3000/verify-email?token=abc-123',
+      'Email to a@example.com: http://localhost:3000/verify-email?uid=user-1&token=abc-123',
     );
   });
 
   it('links a password reset email to the reset page', async () => {
     const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
 
-    await new MailService().sendPasswordResetEmail('a@example.com', 'abc-123');
+    await new MailService().sendPasswordResetEmail(
+      'a@example.com',
+      'user-1',
+      'abc-123',
+    );
 
     expect(log).toHaveBeenCalledWith(
-      'Email to a@example.com: http://localhost:3000/reset-password?token=abc-123',
+      'Email to a@example.com: http://localhost:3000/reset-password?uid=user-1&token=abc-123',
     );
   });
 
@@ -39,14 +47,18 @@ describe('MailService', () => {
     env.resendApiKey = 're_test';
     send.mockResolvedValue({ data: { id: '1' }, error: null });
 
-    await new MailService().sendVerificationEmail('a@example.com', 'abc-123');
+    await new MailService().sendVerificationEmail(
+      'a@example.com',
+      'user-1',
+      'abc-123',
+    );
 
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         from: env.mailFrom,
         to: 'a@example.com',
         html: expect.stringContaining(
-          'http://localhost:3000/verify-email?token=abc-123',
+          'http://localhost:3000/verify-email?uid=user-1&token=abc-123',
         ) as string,
       }),
     );
@@ -57,7 +69,11 @@ describe('MailService', () => {
     send.mockResolvedValue({ data: null, error: { message: 'bad domain' } });
 
     await expect(
-      new MailService().sendVerificationEmail('a@example.com', 'abc-123'),
+      new MailService().sendVerificationEmail(
+        'a@example.com',
+        'user-1',
+        'abc-123',
+      ),
     ).rejects.toThrow('Resend: bad domain');
   });
 });

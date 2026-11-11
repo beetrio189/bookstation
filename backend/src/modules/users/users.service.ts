@@ -60,7 +60,7 @@ export class UsersService {
           role: RoleCode.READER,
           name: data.name,
           notificationEmail: data.email,
-          notificationEmailVerified: true,
+          notificationEmailVerified: false,
         }),
       );
 
@@ -111,11 +111,34 @@ export class UsersService {
     });
   }
 
-  async markLocalVerified(userId: string): Promise<void> {
-    await this.providersRepository.update(
-      { userId, provider: IdentityProvider.LOCAL },
-      { verified: true },
-    );
+  /**
+   * Đánh dấu email đăng nhập local đã xác minh. Nếu email nhận thông báo của
+   * user chưa xác minh thì lấy luôn email vừa xác minh làm email nhận thông báo.
+   * Trả về false khi user không còn provider local (ví dụ đã bị job xóa).
+   */
+  markLocalVerified(userId: string): Promise<boolean> {
+    return this.usersRepository.manager.transaction(async (manager) => {
+      const provider = await manager.findOne(Provider, {
+        where: { userId, provider: IdentityProvider.LOCAL },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!provider) {
+        return false;
+      }
+
+      await manager.update(Provider, { id: provider.id }, { verified: true });
+      await manager.update(
+        User,
+        { id: userId, notificationEmailVerified: false },
+        {
+          notificationEmail: provider.providerKey,
+          notificationEmailVerified: true,
+        },
+      );
+
+      return true;
+    });
   }
 
   async updateLocalPassword(
@@ -126,5 +149,29 @@ export class UsersService {
       { userId, provider: IdentityProvider.LOCAL },
       { passwordHash },
     );
+  }
+
+  async deleteUnverifiedLocalUsers(createdBefore: Date): Promise<number> {
+    const [rows] = (await this.usersRepository.query(
+      `
+        WITH deleted_providers AS (
+          DELETE FROM "providers" p
+          WHERE p."verified" = false
+            AND p."created_at" < $1
+            AND NOT EXISTS (
+              SELECT 1 FROM "providers" o
+              WHERE o."user_id" = p."user_id" AND o."id" <> p."id"
+            )
+          RETURNING p."user_id"
+        )
+        DELETE FROM "users" u
+        USING deleted_providers d
+        WHERE u."id" = d."user_id"
+        RETURNING u."id"
+      `,
+      [createdBefore],
+    )) as [unknown[], number];
+
+    return rows.length;
   }
 }

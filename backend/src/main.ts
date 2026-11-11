@@ -4,12 +4,10 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { env } from './config';
 import { AppModule } from './modules/app.module';
-import { ERRORS } from './utils/errors/errors';
 import { validationExceptionFactory } from './utils/errors/validation-exception.factory';
 
 const setMiddleware = (app: NestExpressApplication) => {
@@ -17,20 +15,6 @@ const setMiddleware = (app: NestExpressApplication) => {
 
   app.enableCors({ origin: env.feUrl, credentials: true });
   app.use(helmet());
-  app.use(
-    rateLimit({
-      windowMs: 60 * 1000,
-      limit: 100,
-      standardHeaders: 'draft-7',
-      legacyHeaders: false,
-      message: {
-        error: {
-          code: ERRORS.TOO_MANY_REQUESTS.code,
-          message: ERRORS.TOO_MANY_REQUESTS.message,
-        },
-      },
-    }),
-  );
   app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
   app.use(compression());
   app.use(cookieParser());

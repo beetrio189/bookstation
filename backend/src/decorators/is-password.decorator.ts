@@ -1,10 +1,21 @@
 import { applyDecorators } from '@nestjs/common';
-import { IsByteLength, IsString, MinLength } from 'class-validator';
-import { MAX_PASSWORD_BYTES } from '../utils/password';
+import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_PATTERN,
+} from '../utils/password';
 
 export const IsPassword = () =>
   applyDecorators(
     IsString({ message: 'Mật khẩu không hợp lệ' }),
-    MinLength(8, { message: 'Mật khẩu phải có ít nhất 8 ký tự' }),
-    IsByteLength(0, MAX_PASSWORD_BYTES, { message: 'Mật khẩu quá dài' }),
+    MinLength(PASSWORD_MIN_LENGTH, {
+      message: `Mật khẩu phải có ít nhất ${PASSWORD_MIN_LENGTH} ký tự`,
+    }),
+    MaxLength(PASSWORD_MAX_LENGTH, {
+      message: `Mật khẩu chỉ được tối đa ${PASSWORD_MAX_LENGTH} ký tự`,
+    }),
+    Matches(PASSWORD_PATTERN, {
+      message: 'Mật khẩu chỉ được gồm chữ cái không dấu và chữ số',
+    }),
   );

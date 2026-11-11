@@ -47,7 +47,7 @@ export const ERRORS = {
   EMAIL_ALREADY_EXISTS: {
     code: 2000,
     status: HttpStatus.CONFLICT,
-    message: 'Email này đã được sử dụng',
+    message: 'Tài khoản đã tồn tại',
   },
   INVALID_CREDENTIALS: {
     code: 2001,

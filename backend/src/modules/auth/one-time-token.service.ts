@@ -8,8 +8,19 @@ export enum OneTimeTokenPurpose {
   RESET_PASSWORD = 'reset-password',
 }
 
-const buildKey = (purpose: OneTimeTokenPurpose, token: string) =>
-  `one-time-token:${purpose}:${createHash('sha256').update(token).digest('hex')}`;
+const CONSUME_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`;
+
+// Mỗi user chỉ có một token cho mỗi mục đích: tạo token mới là ghi đè token cũ
+const buildKey = (purpose: OneTimeTokenPurpose, userId: string) =>
+  `one-time-token:${purpose}:${userId}`;
+
+const hashToken = (token: string) =>
+  createHash('sha256').update(token).digest('hex');
 
 @Injectable()
 export class OneTimeTokenService {
@@ -22,17 +33,38 @@ export class OneTimeTokenService {
   ): Promise<string> {
     const token = randomBytes(32).toString('base64url');
 
-    await this.redis.set(buildKey(purpose, token), userId, 'EX', ttlSeconds);
+    await this.redis.set(
+      buildKey(purpose, userId),
+      hashToken(token),
+      'EX',
+      ttlSeconds,
+    );
 
     return token;
   }
 
-  // Xem token còn hiệu lực không, chưa xóa
-  peek(purpose: OneTimeTokenPurpose, token: string): Promise<string | null> {
-    return this.redis.get(buildKey(purpose, token));
+  async peek(
+    purpose: OneTimeTokenPurpose,
+    userId: string,
+    token: string,
+  ): Promise<boolean> {
+    return (
+      (await this.redis.get(buildKey(purpose, userId))) === hashToken(token)
+    );
   }
 
-  consume(purpose: OneTimeTokenPurpose, token: string): Promise<string | null> {
-    return this.redis.getdel(buildKey(purpose, token));
+  async consume(
+    purpose: OneTimeTokenPurpose,
+    userId: string,
+    token: string,
+  ): Promise<boolean> {
+    const deleted = await this.redis.eval(
+      CONSUME_SCRIPT,
+      1,
+      buildKey(purpose, userId),
+      hashToken(token),
+    );
+
+    return deleted === 1;
   }
 }

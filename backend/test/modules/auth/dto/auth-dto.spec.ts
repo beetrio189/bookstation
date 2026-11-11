@@ -13,9 +13,10 @@ const pipe = new ValidationPipe({
 });
 const VALID = {
   email: 'a@example.com',
-  password: 'mat-khau-dai',
+  password: 'MatKhau123',
   name: 'Wing',
 };
+const UID = '019a6e1c-3f2b-7a4c-8d1e-2b3c4d5e6f70';
 const validate = (metatype: new () => object, value: object) =>
   pipe.transform(value, { type: 'body', metatype });
 
@@ -34,11 +35,14 @@ describe('auth DTOs', () => {
     });
   });
 
-  it('accepts a password of exactly 72 bytes in Vietnamese', async () => {
-    await expect(
-      validate(RegisterDto, { ...VALID, password: 'ệ'.repeat(24) }),
-    ).resolves.toBeInstanceOf(RegisterDto);
-  });
+  it.each(['a'.repeat(8), 'Ab1'.repeat(5)])(
+    'accepts the password %s',
+    async (password) => {
+      await expect(
+        validate(RegisterDto, { ...VALID, password }),
+      ).resolves.toBeInstanceOf(RegisterDto);
+    },
+  );
 
   it.each([
     ['a missing email', { email: undefined }, 'Email không đúng định dạng'],
@@ -54,8 +58,21 @@ describe('auth DTOs', () => {
       { password: 'ngan' },
       'Mật khẩu phải có ít nhất 8 ký tự',
     ],
-    ['a 73-byte password', { password: 'a'.repeat(73) }, 'Mật khẩu quá dài'],
-    ['a 75-byte password', { password: 'ệ'.repeat(25) }, 'Mật khẩu quá dài'],
+    [
+      'a 16-character password',
+      { password: 'a'.repeat(16) },
+      'Mật khẩu chỉ được tối đa 15 ký tự',
+    ],
+    [
+      'a password with Vietnamese letters',
+      { password: 'matkhauấ1' },
+      'Mật khẩu chỉ được gồm chữ cái không dấu và chữ số',
+    ],
+    [
+      'a password with symbols',
+      { password: 'mat-khau-1' },
+      'Mật khẩu chỉ được gồm chữ cái không dấu và chữ số',
+    ],
     [
       'a blank display name',
       { name: '   ' },
@@ -95,17 +112,23 @@ describe('auth DTOs', () => {
 
   it.each([
     ['a missing token', { token: undefined }, 'Thiếu mã đặt lại mật khẩu'],
+    ['a bad uid', { uid: 'abc' }, 'Mã đặt lại mật khẩu không hợp lệ'],
     [
       'a short password',
       { newPassword: 'ngan' },
       'Mật khẩu phải có ít nhất 8 ký tự',
     ],
-    ['a 75-byte password', { newPassword: 'ệ'.repeat(25) }, 'Mật khẩu quá dài'],
+    [
+      'a 16-character password',
+      { newPassword: 'a'.repeat(16) },
+      'Mật khẩu chỉ được tối đa 15 ký tự',
+    ],
   ])('rejects a password reset with %s', async (_case, override, message) => {
     await expect(
       validate(ResetPasswordDto, {
+        uid: UID,
         token: 'token-1',
-        newPassword: 'mat-khau-moi',
+        newPassword: 'MatKhauMoi1',
         ...override,
       }),
     ).rejects.toMatchObject({ code: 1000, message });
@@ -126,15 +149,26 @@ describe('auth DTOs', () => {
     await expect(
       validate(ChangePasswordDto, {
         currentPassword: 'mat-khau-cu',
-        newPassword: 'mat-khau-moi',
+        newPassword: 'MatKhauMoi1',
         ...override,
       }),
     ).rejects.toMatchObject({ code: 1000, message });
   });
 
-  it('asks for the token when it is missing', async () => {
-    await expect(validate(VerifyEmailDto, {})).rejects.toMatchObject({
-      message: 'Thiếu mã xác nhận',
+  it('accepts a verify-email link with a uuidv7 uid', async () => {
+    await expect(
+      validate(VerifyEmailDto, { uid: UID, token: 'token-1' }),
+    ).resolves.toEqual({ uid: UID, token: 'token-1' });
+  });
+
+  it.each([
+    ['a missing token', { uid: UID }, 'Thiếu mã xác nhận'],
+    ['a missing uid', { token: 'token-1' }, 'Mã xác nhận không hợp lệ'],
+    ['a bad uid', { uid: 'abc', token: 'token-1' }, 'Mã xác nhận không hợp lệ'],
+  ])('rejects a verify-email link with %s', async (_case, value, message) => {
+    await expect(validate(VerifyEmailDto, value)).rejects.toMatchObject({
+      code: 1000,
+      message,
     });
   });
 });

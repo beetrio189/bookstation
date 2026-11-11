@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
+import { ScheduleModule } from '@nestjs/schedule';
+import { minutes, ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import Redis from 'ioredis';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { env } from '../config';
 import { AllExceptionsFilter } from '../filters/all-exceptions.filter';
@@ -10,7 +14,7 @@ import { ResponseInterceptor } from '../interceptors/response.interceptor';
 import dataSource from '../libs/typeorm.config';
 import { AuthModule } from './auth/auth.module';
 import { HealthCheckModule } from './health-check/health-check.module';
-import { RedisModule } from './redis/redis.module';
+import { REDIS_CLIENT, RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -24,6 +28,14 @@ import { UsersModule } from './users/users.module';
       secret: env.jwtSecret,
       signOptions: { expiresIn: '15m' },
     }),
+    ScheduleModule.forRoot(),
+    ThrottlerModule.forRootAsync({
+      inject: [REDIS_CLIENT],
+      useFactory: (redis: Redis) => ({
+        throttlers: [{ ttl: minutes(1), limit: 100 }],
+        storage: new ThrottlerStorageRedisService(redis),
+      }),
+    }),
     RedisModule,
     HealthCheckModule,
     UsersModule,
@@ -32,6 +44,7 @@ import { UsersModule } from './users/users.module';
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

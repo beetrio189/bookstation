@@ -26,7 +26,7 @@ describe('AllExceptionsFilter', () => {
 
     expect(status).toHaveBeenCalledWith(409);
     expect(json).toHaveBeenCalledWith({
-      error: { code: 2000, message: 'Email này đã được sử dụng' },
+      error: { code: 2000, message: 'Tài khoản đã tồn tại' },
     });
   });
 

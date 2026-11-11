@@ -7,14 +7,16 @@ import { usePasswordConfirm } from "@/hooks/use-password-confirm";
 
 // Khớp với IsPassword của backend
 const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 15;
+const PASSWORD_PATTERN = "[a-zA-Z0-9]+";
 
 export function ResetPasswordForm() {
   const { passwordRef, confirmRef, check } = usePasswordConfirm();
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // TODO: gọi POST /auth/reset-password { token, newPassword } khi có lớp
-    // gọi API. token lấy từ ?token= trong link email.
+    // TODO: gọi POST /auth/reset-password { uid, token, newPassword } khi có
+    // lớp gọi API. uid và token lấy từ ?uid=&token= trong link email.
   };
 
   return (
@@ -36,6 +38,9 @@ export function ResetPasswordForm() {
         label="Mật khẩu mới"
         autoComplete="new-password"
         minLength={PASSWORD_MIN_LENGTH}
+        maxLength={PASSWORD_MAX_LENGTH}
+        pattern={PASSWORD_PATTERN}
+        title="8–15 ký tự, chỉ gồm chữ cái không dấu và chữ số"
         onChange={check}
         required
       />

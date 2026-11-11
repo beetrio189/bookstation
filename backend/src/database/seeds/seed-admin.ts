@@ -5,13 +5,22 @@ import { Provider } from '../../modules/users/entities/provider.entity';
 import { User } from '../../modules/users/entities/user.entity';
 import { IdentityProvider } from '../../utils/enums/identity-provider.enum';
 import { RoleCode } from '../../utils/enums/role-code.enum';
-import { hashPassword, isPasswordWithinLimit } from '../../utils/password';
+import {
+  hashPassword,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_PATTERN,
+} from '../../utils/password';
 
 const logger = new Logger('SeedAdmin');
 
 const adminSchema = z.object({
   ADMIN_EMAIL: z.email().toLowerCase(),
-  ADMIN_PASSWORD: z.string().min(8).refine(isPasswordWithinLimit),
+  ADMIN_PASSWORD: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH)
+    .max(PASSWORD_MAX_LENGTH)
+    .regex(PASSWORD_PATTERN),
   ADMIN_DISPLAY_NAME: z.string().min(1).max(100).default('Quản trị viên'),
 });
 

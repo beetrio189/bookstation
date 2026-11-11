@@ -17,6 +17,7 @@ import { UsersService } from '../users/users.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GoogleOAuthService, GoogleProfile } from './google-oauth.service';
 import {
@@ -29,6 +30,8 @@ const VERIFY_EMAIL_TTL_SECONDS = 24 * 60 * 60;
 const RESET_PASSWORD_TTL_SECONDS = 30 * 60;
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 const MAX_NAME_LENGTH = 100;
+const REGISTER_SUCCESS_MESSAGE =
+  'Đăng ký thành công! Chúng tôi đã gửi email xác minh tới địa chỉ bạn cung cấp. Link xác minh có hiệu lực trong 24 giờ. Tài khoản chưa xác minh sẽ bị xóa sau 7 ngày.';
 
 const isLocked = (user: User): boolean => user.status === UserStatus.LOCKED;
 
@@ -62,27 +65,31 @@ export class AuthService {
 
     await this.sendVerificationEmail(user.id, email);
 
-    return { id: user.id, email, name: user.name };
+    return { message: REGISTER_SUCCESS_MESSAGE };
   }
 
-  async verifyEmail(token: string): Promise<void> {
-    const userId = await this.oneTimeTokenService.consume(
+  async verifyEmail({ uid, token }: VerifyEmailDto): Promise<void> {
+    const isValid = await this.oneTimeTokenService.peek(
       OneTimeTokenPurpose.VERIFY_EMAIL,
+      uid,
       token,
     );
 
-    if (!userId) {
+    if (!isValid || !(await this.usersService.markLocalVerified(uid))) {
       throw new AppException(ERRORS.INVALID_TOKEN);
     }
 
-    await this.usersService.markLocalVerified(userId);
+    await this.oneTimeTokenService.consume(
+      OneTimeTokenPurpose.VERIFY_EMAIL,
+      uid,
+      token,
+    );
   }
 
   async resendVerification(email: string): Promise<void> {
     const provider = await this.usersService.findLocalProvider(email);
 
     if (provider && !provider.verified) {
-      // Không await để thời gian phản hồi không lộ email nào đã đăng ký
       void this.sendVerificationEmail(provider.userId, email);
     }
   }
@@ -154,19 +161,23 @@ export class AuthService {
     }
   }
 
-  async resetPassword({ token, newPassword }: ResetPasswordDto): Promise<void> {
+  async resetPassword({
+    uid,
+    token,
+    newPassword,
+  }: ResetPasswordDto): Promise<void> {
     // Chỉ xem trước, để nhập trùng mật khẩu cũ thì vẫn dùng lại được link
-    const userId = await this.oneTimeTokenService.peek(
+    const isValid = await this.oneTimeTokenService.peek(
       OneTimeTokenPurpose.RESET_PASSWORD,
+      uid,
       token,
     );
 
-    if (!userId) {
+    if (!isValid) {
       throw new AppException(ERRORS.INVALID_TOKEN);
     }
 
-    const provider =
-      await this.usersService.findLocalProviderWithPassword(userId);
+    const provider = await this.usersService.findLocalProviderWithPassword(uid);
 
     if (
       provider?.passwordHash &&
@@ -176,20 +187,21 @@ export class AuthService {
     }
 
     // Hai request cùng lúc với một token thì chỉ một request được đi tiếp
-    const consumedUserId = await this.oneTimeTokenService.consume(
+    const isConsumed = await this.oneTimeTokenService.consume(
       OneTimeTokenPurpose.RESET_PASSWORD,
+      uid,
       token,
     );
 
-    if (consumedUserId !== userId) {
+    if (!isConsumed) {
       throw new AppException(ERRORS.INVALID_TOKEN);
     }
 
     await this.usersService.updateLocalPassword(
-      userId,
+      uid,
       await hashPassword(newPassword),
     );
-    await this.refreshTokenService.revokeAll(userId);
+    await this.refreshTokenService.revokeAll(uid);
   }
 
   async changePassword(
@@ -311,7 +323,7 @@ export class AuthService {
         VERIFY_EMAIL_TTL_SECONDS,
       );
 
-      await this.mailService.sendVerificationEmail(email, token);
+      await this.mailService.sendVerificationEmail(email, userId, token);
     } catch (error) {
       this.logger.error(error);
     }
@@ -328,7 +340,7 @@ export class AuthService {
         RESET_PASSWORD_TTL_SECONDS,
       );
 
-      await this.mailService.sendPasswordResetEmail(email, token);
+      await this.mailService.sendPasswordResetEmail(email, userId, token);
     } catch (error) {
       this.logger.error(error);
     }

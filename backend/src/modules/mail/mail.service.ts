@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 import { env } from '../../config';
 
+// Link trong email mang cả uid lẫn token: Redis lưu token theo uid
+const buildLink = (path: string, userId: string, token: string) =>
+  `${env.feUrl}/${path}?${new URLSearchParams({ uid: userId, token }).toString()}`;
+
 interface MailMessage {
   to: string;
   subject: string;
@@ -16,8 +20,12 @@ export class MailService {
     ? new Resend(env.resendApiKey)
     : null;
 
-  async sendVerificationEmail(to: string, token: string): Promise<void> {
-    const link = `${env.feUrl}/verify-email?token=${encodeURIComponent(token)}`;
+  async sendVerificationEmail(
+    to: string,
+    userId: string,
+    token: string,
+  ): Promise<void> {
+    const link = buildLink('verify-email', userId, token);
 
     await this.send({
       to,
@@ -32,8 +40,12 @@ export class MailService {
     });
   }
 
-  async sendPasswordResetEmail(to: string, token: string): Promise<void> {
-    const link = `${env.feUrl}/reset-password?token=${encodeURIComponent(token)}`;
+  async sendPasswordResetEmail(
+    to: string,
+    userId: string,
+    token: string,
+  ): Promise<void> {
+    const link = buildLink('reset-password', userId, token);
 
     await this.send({
       to,

@@ -9,6 +9,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
+import { minutes, Throttle } from '@nestjs/throttler';
 import { randomBytes } from 'crypto';
 import { CookieOptions, Request, Response } from 'express';
 import { env } from '../../config';
@@ -83,10 +84,12 @@ export class AuthController {
   }
 
   @Public()
+  // Chặn dò token theo IP
+  @Throttle({ default: { ttl: minutes(1), limit: 20 } })
   @HttpCode(HttpStatus.OK)
   @Post('verify-email')
   verifyEmail(@Body() dto: VerifyEmailDto) {
-    return this.authService.verifyEmail(dto.token);
+    return this.authService.verifyEmail(dto);
   }
 
   @Public()

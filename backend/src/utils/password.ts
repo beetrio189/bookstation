@@ -2,6 +2,9 @@ import { compare, hash } from 'bcryptjs';
 
 const COST_FACTOR = 12;
 export const MAX_PASSWORD_BYTES = 72;
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 15;
+export const PASSWORD_PATTERN = /^[a-zA-Z0-9]+$/;
 
 export const DUMMY_PASSWORD_HASH =
   '$2b$12$giA.HBgG8aulZ8TdFg3hRu/.vYwEi6fZQehRtgnclb2VZvKbwruKO';

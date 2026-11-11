@@ -30,7 +30,7 @@ const PROVIDER = {
   verified: true as boolean | null,
   user: USER,
 };
-const REGISTER = { email: EMAIL, password: 'mat-khau-dai', name: USER.name };
+const REGISTER = { email: EMAIL, password: 'MatKhau123', name: USER.name };
 
 describe('AuthService', () => {
   const usersService = {
@@ -81,9 +81,7 @@ describe('AuthService', () => {
   describe('register', () => {
     it('creates a reader with a hashed password and emails a 24h token', async () => {
       await expect(service.register(REGISTER)).resolves.toEqual({
-        id: USER.id,
-        email: EMAIL,
-        name: USER.name,
+        message: expect.stringContaining('Đăng ký thành công') as string,
       });
 
       const [created] = usersService.createReader.mock.calls[0] as [
@@ -101,18 +99,25 @@ describe('AuthService', () => {
       );
       expect(mailService.sendVerificationEmail).toHaveBeenCalledWith(
         EMAIL,
+        USER.id,
         'token-1',
       );
     });
 
-    it('rejects an email that already exists', async () => {
-      usersService.findLocalProvider.mockResolvedValue(PROVIDER);
+    it.each([true, false])(
+      'rejects an email that already exists (verified: %s)',
+      async (verified) => {
+        usersService.findLocalProvider.mockResolvedValue({
+          ...PROVIDER,
+          verified,
+        });
 
-      await expect(service.register(REGISTER)).rejects.toMatchObject({
-        code: 2000,
-      });
-      expect(usersService.createReader).not.toHaveBeenCalled();
-    });
+        await expect(service.register(REGISTER)).rejects.toMatchObject({
+          code: 2000,
+        });
+        expect(usersService.createReader).not.toHaveBeenCalled();
+      },
+    );
 
     it('rejects when a concurrent request takes the email first', async () => {
       usersService.createReader.mockRejectedValue(
@@ -137,33 +142,65 @@ describe('AuthService', () => {
       const failure = new Error('Resend: down');
       mailService.sendVerificationEmail.mockRejectedValue(failure);
 
-      await expect(service.register(REGISTER)).resolves.toMatchObject({
-        id: USER.id,
-      });
+      await expect(service.register(REGISTER)).resolves.toHaveProperty(
+        'message',
+      );
       expect(Logger.prototype.error).toHaveBeenCalledWith(failure);
     });
   });
 
   describe('verifyEmail', () => {
-    it('marks the local login verified', async () => {
-      oneTimeTokenService.consume.mockResolvedValue(USER.id);
+    const VERIFY = { uid: USER.id, token: 'token-1' };
 
-      await service.verifyEmail('token-1');
+    it('marks the local login verified, then deletes the token', async () => {
+      oneTimeTokenService.peek.mockResolvedValue(true);
+      usersService.markLocalVerified.mockResolvedValue(true);
 
-      expect(oneTimeTokenService.consume).toHaveBeenCalledWith(
+      await service.verifyEmail(VERIFY);
+
+      expect(oneTimeTokenService.peek).toHaveBeenCalledWith(
         OneTimeTokenPurpose.VERIFY_EMAIL,
+        USER.id,
         'token-1',
       );
       expect(usersService.markLocalVerified).toHaveBeenCalledWith(USER.id);
+      expect(oneTimeTokenService.consume).toHaveBeenCalledWith(
+        OneTimeTokenPurpose.VERIFY_EMAIL,
+        USER.id,
+        'token-1',
+      );
+      expect(
+        usersService.markLocalVerified.mock.invocationCallOrder[0],
+      ).toBeLessThan(oneTimeTokenService.consume.mock.invocationCallOrder[0]);
     });
 
-    it('rejects an invalid or used token', async () => {
-      oneTimeTokenService.consume.mockResolvedValue(null);
+    it('rejects an invalid or used token and deletes nothing', async () => {
+      oneTimeTokenService.peek.mockResolvedValue(false);
 
-      await expect(service.verifyEmail('bad')).rejects.toMatchObject({
+      await expect(
+        service.verifyEmail({ uid: USER.id, token: 'bad' }),
+      ).rejects.toMatchObject({ code: 2004 });
+      expect(usersService.markLocalVerified).not.toHaveBeenCalled();
+      expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the user no longer has a local login', async () => {
+      oneTimeTokenService.peek.mockResolvedValue(true);
+      usersService.markLocalVerified.mockResolvedValue(false);
+
+      await expect(service.verifyEmail(VERIFY)).rejects.toMatchObject({
         code: 2004,
       });
-      expect(usersService.markLocalVerified).not.toHaveBeenCalled();
+      expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
+    });
+
+    it('keeps the token when the database update fails', async () => {
+      const failure = new Error('connection lost');
+      oneTimeTokenService.peek.mockResolvedValue(true);
+      usersService.markLocalVerified.mockRejectedValue(failure);
+
+      await expect(service.verifyEmail(VERIFY)).rejects.toBe(failure);
+      expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
     });
   });
 
@@ -184,6 +221,7 @@ describe('AuthService', () => {
       );
       expect(mailService.sendVerificationEmail).toHaveBeenCalledWith(
         EMAIL,
+        USER.id,
         'token-1',
       );
     });
@@ -533,6 +571,7 @@ describe('AuthService', () => {
         );
         expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith(
           EMAIL,
+          USER.id,
           'token-1',
         );
       });
@@ -584,8 +623,8 @@ describe('AuthService', () => {
 
     describe('resetPassword', () => {
       beforeEach(async () => {
-        oneTimeTokenService.peek.mockResolvedValue(USER.id);
-        oneTimeTokenService.consume.mockResolvedValue(USER.id);
+        oneTimeTokenService.peek.mockResolvedValue(true);
+        oneTimeTokenService.consume.mockResolvedValue(true);
         usersService.findLocalProviderWithPassword.mockResolvedValue({
           ...PROVIDER,
           passwordHash: await hashPassword(CURRENT),
@@ -593,13 +632,18 @@ describe('AuthService', () => {
       });
 
       it('sets the password and revokes all sessions', async () => {
-        await service.resetPassword({ token: 'token-1', newPassword: NEW });
+        await service.resetPassword({
+          uid: USER.id,
+          token: 'token-1',
+          newPassword: NEW,
+        });
 
         expect(usersService.findLocalProviderWithPassword).toHaveBeenCalledWith(
           USER.id,
         );
         expect(oneTimeTokenService.consume).toHaveBeenCalledWith(
           OneTimeTokenPurpose.RESET_PASSWORD,
+          USER.id,
           'token-1',
         );
         expect(usersService.updateLocalPassword.mock.calls[0][0]).toBe(USER.id);
@@ -608,10 +652,14 @@ describe('AuthService', () => {
       });
 
       it('rejects an invalid or used token and changes nothing', async () => {
-        oneTimeTokenService.peek.mockResolvedValue(null);
+        oneTimeTokenService.peek.mockResolvedValue(false);
 
         await expect(
-          service.resetPassword({ token: 'bad', newPassword: NEW }),
+          service.resetPassword({
+            uid: USER.id,
+            token: 'bad',
+            newPassword: NEW,
+          }),
         ).rejects.toMatchObject({ code: 2004 });
         expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
         expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
@@ -620,17 +668,25 @@ describe('AuthService', () => {
 
       it('rejects the current password and keeps the token usable', async () => {
         await expect(
-          service.resetPassword({ token: 'token-1', newPassword: CURRENT }),
+          service.resetPassword({
+            uid: USER.id,
+            token: 'token-1',
+            newPassword: CURRENT,
+          }),
         ).rejects.toMatchObject({ code: 2008 });
         expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
         expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
       });
 
       it('lets only one of two concurrent requests through', async () => {
-        oneTimeTokenService.consume.mockResolvedValue(null);
+        oneTimeTokenService.consume.mockResolvedValue(false);
 
         await expect(
-          service.resetPassword({ token: 'token-1', newPassword: NEW }),
+          service.resetPassword({
+            uid: USER.id,
+            token: 'token-1',
+            newPassword: NEW,
+          }),
         ).rejects.toMatchObject({ code: 2004 });
         expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
       });
