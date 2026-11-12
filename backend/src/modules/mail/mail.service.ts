@@ -26,6 +26,7 @@ export class MailService {
     token: string,
   ): Promise<void> {
     const link = buildLink('verify-email', userId, token);
+    const forgotPasswordLink = `${env.feUrl}/forgot-password`;
 
     await this.send({
       to,
@@ -34,7 +35,7 @@ export class MailService {
         <p>Chào bạn,</p>
         <p>Bấm vào liên kết dưới đây để xác nhận tài khoản BookStation. Liên kết có hiệu lực trong 24 giờ.</p>
         <p><a href="${link}">Xác nhận tài khoản</a></p>
-        <p>Nếu bạn không đăng ký tài khoản này, hãy bỏ qua email.</p>
+        <p>Nếu bạn không chắc chắn rằng email này do bạn gửi, hãy truy cập <a href="${forgotPasswordLink}">Quên mật khẩu</a> để tránh rủi ro bị chiếm tài khoản.</p>
       `,
       devNote: link,
     });

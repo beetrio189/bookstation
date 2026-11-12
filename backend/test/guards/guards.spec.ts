@@ -47,7 +47,6 @@ class StaffController {
 
 const payloadFor = (id: string, role: RoleCode): JwtPayload => ({
   sub: id,
-  notificationEmail: `${id}@example.com`,
   role,
 });
 
@@ -128,7 +127,6 @@ describe('JwtAuthGuard + RolesGuard', () => {
       .expect({
         data: {
           id: 'editor',
-          notificationEmail: 'editor@example.com',
           role: 'editor',
         },
       });

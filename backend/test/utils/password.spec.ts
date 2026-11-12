@@ -2,7 +2,6 @@ import { getRounds } from 'bcryptjs';
 import {
   DUMMY_PASSWORD_HASH,
   hashPassword,
-  isPasswordWithinLimit,
   verifyPassword,
 } from '../../src/utils/password';
 
@@ -29,12 +28,5 @@ describe('password', () => {
     expect(getRounds(DUMMY_PASSWORD_HASH)).toBe(
       getRounds(await hashPassword('Mật khẩu bí mật')),
     );
-  });
-
-  it('limits a password by bytes, not characters', () => {
-    expect(isPasswordWithinLimit('a'.repeat(72))).toBe(true);
-    expect(isPasswordWithinLimit('a'.repeat(73))).toBe(false);
-    expect(isPasswordWithinLimit('ệ'.repeat(24))).toBe(true);
-    expect(isPasswordWithinLimit('ệ'.repeat(25))).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { Repository } from 'typeorm';
+import { LessThanOrEqual, Repository } from 'typeorm';
 import { RefreshToken } from '../../../src/modules/auth/entities/refresh-token.entity';
 import { RefreshTokenService } from '../../../src/modules/auth/refresh-token.service';
 
@@ -43,12 +43,20 @@ describe('RefreshTokenService', () => {
     );
   });
 
-  it('removes the expired tokens of the user when creating one', async () => {
+  it('only inserts when creating a token, cleanup is left to the job', async () => {
     await service.create('user-1');
 
-    expect(repository.delete).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user-1' }),
-    );
+    expect(repository.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes every expired token and returns how many', async () => {
+    const now = new Date('2026-11-13T00:00:00+07:00');
+    repository.delete.mockResolvedValue({ affected: 3 });
+
+    await expect(service.deleteExpired(now)).resolves.toBe(3);
+    expect(repository.delete).toHaveBeenCalledWith({
+      expiresAt: LessThanOrEqual(now),
+    });
   });
 
   it('generates a different token each time', async () => {

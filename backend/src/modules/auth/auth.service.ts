@@ -7,10 +7,10 @@ import { ERRORS } from '../../utils/errors/errors';
 import {
   DUMMY_PASSWORD_HASH,
   hashPassword,
-  isPasswordWithinLimit,
   verifyPassword,
 } from '../../utils/password';
 import { JwtPayload } from '../../utils/types/jwt-payload';
+import { MailQueueService } from '../mail/mail-queue.service';
 import { MailService } from '../mail/mail.service';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
@@ -26,12 +26,9 @@ import {
 } from './one-time-token.service';
 import { RefreshTokenService } from './refresh-token.service';
 
-const VERIFY_EMAIL_TTL_SECONDS = 24 * 60 * 60;
 const RESET_PASSWORD_TTL_SECONDS = 30 * 60;
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 const MAX_NAME_LENGTH = 100;
-const REGISTER_SUCCESS_MESSAGE =
-  'Đăng ký thành công! Chúng tôi đã gửi email xác minh tới địa chỉ bạn cung cấp. Link xác minh có hiệu lực trong 24 giờ. Tài khoản chưa xác minh sẽ bị xóa sau 7 ngày.';
 
 const isLocked = (user: User): boolean => user.status === UserStatus.LOCKED;
 
@@ -50,9 +47,10 @@ export class AuthService {
     private readonly refreshTokenService: RefreshTokenService,
     private readonly jwtService: JwtService,
     private readonly googleOAuthService: GoogleOAuthService,
+    private readonly mailQueueService: MailQueueService,
   ) {}
 
-  async register({ email, password, name }: RegisterDto) {
+  async register({ email, password, name }: RegisterDto): Promise<void> {
     if (await this.usersService.findLocalProvider(email)) {
       throw new AppException(ERRORS.EMAIL_ALREADY_EXISTS);
     }
@@ -63,9 +61,7 @@ export class AuthService {
       name,
     );
 
-    await this.sendVerificationEmail(user.id, email);
-
-    return { message: REGISTER_SUCCESS_MESSAGE };
+    await this.enqueueVerificationEmail(user.id, email);
   }
 
   async verifyEmail({ uid, token }: VerifyEmailDto): Promise<void> {
@@ -89,8 +85,8 @@ export class AuthService {
   async resendVerification(email: string): Promise<void> {
     const provider = await this.usersService.findLocalProvider(email);
 
-    if (provider && !provider.verified) {
-      void this.sendVerificationEmail(provider.userId, email);
+    if (provider && !provider.verified && !isLocked(provider.user)) {
+      void this.enqueueVerificationEmail(provider.userId, email);
     }
   }
 
@@ -101,11 +97,7 @@ export class AuthService {
       password,
     );
 
-    if (
-      !provider?.passwordHash ||
-      !isPasswordCorrect ||
-      !isPasswordWithinLimit(password)
-    ) {
+    if (!provider?.passwordHash || !isPasswordCorrect) {
       throw new AppException(ERRORS.INVALID_CREDENTIALS);
     }
 
@@ -156,7 +148,7 @@ export class AuthService {
   async forgotPassword(email: string): Promise<void> {
     const provider = await this.usersService.findLocalProvider(email);
 
-    if (provider?.verified && !isLocked(provider.user)) {
+    if (provider && !isLocked(provider.user)) {
       void this.sendPasswordResetEmail(provider.userId, email);
     }
   }
@@ -197,10 +189,15 @@ export class AuthService {
       throw new AppException(ERRORS.INVALID_TOKEN);
     }
 
-    await this.usersService.updateLocalPassword(
+    const isUpdated = await this.usersService.resetLocalPassword(
       uid,
       await hashPassword(newPassword),
     );
+
+    if (!isUpdated) {
+      throw new AppException(ERRORS.INVALID_TOKEN);
+    }
+
     await this.refreshTokenService.revokeAll(uid);
   }
 
@@ -219,10 +216,7 @@ export class AuthService {
       throw new AppException(ERRORS.PASSWORD_NOT_SET);
     }
 
-    if (
-      !isPasswordWithinLimit(currentPassword) ||
-      !(await verifyPassword(provider.passwordHash, currentPassword))
-    ) {
+    if (!(await verifyPassword(provider.passwordHash, currentPassword))) {
       throw new AppException(ERRORS.WRONG_PASSWORD);
     }
 
@@ -253,7 +247,6 @@ export class AuthService {
   private async issueTokens(user: User) {
     const payload: JwtPayload = {
       sub: user.id,
-      notificationEmail: user.notificationEmail,
       role: user.role,
     };
 
@@ -312,18 +305,12 @@ export class AuthService {
     }
   }
 
-  private async sendVerificationEmail(
+  private async enqueueVerificationEmail(
     userId: string,
     email: string,
   ): Promise<void> {
     try {
-      const token = await this.oneTimeTokenService.create(
-        OneTimeTokenPurpose.VERIFY_EMAIL,
-        userId,
-        VERIFY_EMAIL_TTL_SECONDS,
-      );
-
-      await this.mailService.sendVerificationEmail(email, userId, token);
+      await this.mailQueueService.enqueueVerificationEmail(userId, email);
     } catch (error) {
       this.logger.error(error);
     }

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MailQueueModule } from '../mail/mail-queue.module';
 import { MailModule } from '../mail/mail.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
@@ -10,7 +11,12 @@ import { OneTimeTokenService } from './one-time-token.service';
 import { RefreshTokenService } from './refresh-token.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RefreshToken]), UsersModule, MailModule],
+  imports: [
+    TypeOrmModule.forFeature([RefreshToken]),
+    UsersModule,
+    MailModule,
+    MailQueueModule,
+  ],
   controllers: [AuthController],
   providers: [
     AuthService,

@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { QueryFailedError } from 'typeorm';
 import { hashPassword, verifyPassword } from '../../../src/utils/password';
+import { MailQueueService } from '../../../src/modules/mail/mail-queue.service';
 import { MailService } from '../../../src/modules/mail/mail.service';
 import { UsersService } from '../../../src/modules/users/users.service';
 import { AuthService } from '../../../src/modules/auth/auth.service';
@@ -41,6 +42,7 @@ describe('AuthService', () => {
     createReader: jest.fn(),
     markLocalVerified: jest.fn(),
     updateLocalPassword: jest.fn(),
+    resetLocalPassword: jest.fn(),
     findGoogleProvider: jest.fn(),
     createGoogleReader: jest.fn(),
   };
@@ -60,6 +62,7 @@ describe('AuthService', () => {
     revokeAll: jest.fn(),
   };
   const jwtService = { signAsync: jest.fn() };
+  const mailQueueService = { enqueueVerificationEmail: jest.fn() };
   const service = new AuthService(
     usersService as unknown as UsersService,
     mailService as unknown as MailService,
@@ -67,6 +70,7 @@ describe('AuthService', () => {
     refreshTokenService as unknown as RefreshTokenService,
     jwtService as unknown as JwtService,
     googleOAuthService as unknown as GoogleOAuthService,
+    mailQueueService as unknown as MailQueueService,
   );
   const flushPromises = () => new Promise(setImmediate);
 
@@ -79,10 +83,8 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('creates a reader with a hashed password and emails a 24h token', async () => {
-      await expect(service.register(REGISTER)).resolves.toEqual({
-        message: expect.stringContaining('Đăng ký thành công') as string,
-      });
+    it('creates a reader with a hashed password and queues the email', async () => {
+      await expect(service.register(REGISTER)).resolves.toBeUndefined();
 
       const [created] = usersService.createReader.mock.calls[0] as [
         { email: string; passwordHash: string; name: string },
@@ -92,16 +94,12 @@ describe('AuthService', () => {
       await expect(
         verifyPassword(created.passwordHash, REGISTER.password),
       ).resolves.toBe(true);
-      expect(oneTimeTokenService.create).toHaveBeenCalledWith(
-        OneTimeTokenPurpose.VERIFY_EMAIL,
+      expect(mailQueueService.enqueueVerificationEmail).toHaveBeenCalledWith(
         USER.id,
-        86400,
-      );
-      expect(mailService.sendVerificationEmail).toHaveBeenCalledWith(
         EMAIL,
-        USER.id,
-        'token-1',
       );
+      // Token do worker tạo lúc gửi, API không tạo
+      expect(oneTimeTokenService.create).not.toHaveBeenCalled();
     });
 
     it.each([true, false])(
@@ -138,13 +136,11 @@ describe('AuthService', () => {
       await expect(service.register(REGISTER)).rejects.toBe(failure);
     });
 
-    it('still succeeds when the email cannot be sent', async () => {
-      const failure = new Error('Resend: down');
-      mailService.sendVerificationEmail.mockRejectedValue(failure);
+    it('still succeeds when the email cannot be queued', async () => {
+      const failure = new Error('Redis: down');
+      mailQueueService.enqueueVerificationEmail.mockRejectedValue(failure);
 
-      await expect(service.register(REGISTER)).resolves.toHaveProperty(
-        'message',
-      );
+      await expect(service.register(REGISTER)).resolves.toBeUndefined();
       expect(Logger.prototype.error).toHaveBeenCalledWith(failure);
     });
   });
@@ -214,15 +210,9 @@ describe('AuthService', () => {
       await service.resendVerification(EMAIL);
       await flushPromises();
 
-      expect(oneTimeTokenService.create).toHaveBeenCalledWith(
-        OneTimeTokenPurpose.VERIFY_EMAIL,
+      expect(mailQueueService.enqueueVerificationEmail).toHaveBeenCalledWith(
         USER.id,
-        86400,
-      );
-      expect(mailService.sendVerificationEmail).toHaveBeenCalledWith(
         EMAIL,
-        USER.id,
-        'token-1',
       );
     });
 
@@ -232,7 +222,7 @@ describe('AuthService', () => {
       ).resolves.toBeUndefined();
       await flushPromises();
 
-      expect(mailService.sendVerificationEmail).not.toHaveBeenCalled();
+      expect(mailQueueService.enqueueVerificationEmail).not.toHaveBeenCalled();
     });
 
     it('does nothing for a verified login', async () => {
@@ -241,7 +231,20 @@ describe('AuthService', () => {
       await service.resendVerification(EMAIL);
       await flushPromises();
 
-      expect(mailService.sendVerificationEmail).not.toHaveBeenCalled();
+      expect(mailQueueService.enqueueVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('does nothing for a locked account, without an error', async () => {
+      usersService.findLocalProvider.mockResolvedValue({
+        ...PROVIDER,
+        verified: false,
+        user: LOCKED_USER,
+      });
+
+      await expect(service.resendVerification(EMAIL)).resolves.toBeUndefined();
+      await flushPromises();
+
+      expect(mailQueueService.enqueueVerificationEmail).not.toHaveBeenCalled();
     });
   });
 
@@ -278,7 +281,6 @@ describe('AuthService', () => {
         );
         expect(jwtService.signAsync).toHaveBeenCalledWith({
           sub: USER.id,
-          notificationEmail: EMAIL,
           role: 'reader',
         });
         expect(refreshTokenService.create).toHaveBeenCalledWith(USER.id);
@@ -307,15 +309,6 @@ describe('AuthService', () => {
         await expect(service.login(LOGIN)).rejects.toMatchObject({
           code: 2001,
         });
-      });
-
-      it('rejects a password that matches only in its first 72 bytes', async () => {
-        const password = 'a'.repeat(72);
-        mockLoginProvider({ passwordHash: await hashPassword(password) });
-
-        await expect(
-          service.login({ ...LOGIN, password: `${password}b` }),
-        ).rejects.toMatchObject({ code: 2001 });
       });
 
       it('rejects an unverified email only after the password is right', async () => {
@@ -374,7 +367,6 @@ describe('AuthService', () => {
         );
         expect(jwtService.signAsync).toHaveBeenCalledWith({
           sub: USER.id,
-          notificationEmail: EMAIL,
           role: 'reader',
         });
         expect(usersService.createGoogleReader).not.toHaveBeenCalled();
@@ -474,7 +466,6 @@ describe('AuthService', () => {
         expect(refreshTokenService.consume).toHaveBeenCalledWith('old');
         expect(jwtService.signAsync).toHaveBeenCalledWith({
           sub: USER.id,
-          notificationEmail: EMAIL,
           role: 'publisher',
         });
       });
@@ -585,16 +576,20 @@ describe('AuthService', () => {
         expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
       });
 
-      it('does nothing for an unverified email, without an error', async () => {
+      it('also emails an unverified login', async () => {
         usersService.findLocalProvider.mockResolvedValue({
           ...PROVIDER,
           verified: false,
         });
 
-        await expect(service.forgotPassword(EMAIL)).resolves.toBeUndefined();
+        await service.forgotPassword(EMAIL);
         await flushPromises();
 
-        expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+        expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+          EMAIL,
+          USER.id,
+          'token-1',
+        );
       });
 
       it('does nothing for a locked account, without an error', async () => {
@@ -625,13 +620,14 @@ describe('AuthService', () => {
       beforeEach(async () => {
         oneTimeTokenService.peek.mockResolvedValue(true);
         oneTimeTokenService.consume.mockResolvedValue(true);
+        usersService.resetLocalPassword.mockResolvedValue(true);
         usersService.findLocalProviderWithPassword.mockResolvedValue({
           ...PROVIDER,
           passwordHash: await hashPassword(CURRENT),
         });
       });
 
-      it('sets the password and revokes all sessions', async () => {
+      it('sets the password, verifies the login and revokes all sessions', async () => {
         await service.resetPassword({
           uid: USER.id,
           token: 'token-1',
@@ -646,8 +642,11 @@ describe('AuthService', () => {
           USER.id,
           'token-1',
         );
-        expect(usersService.updateLocalPassword.mock.calls[0][0]).toBe(USER.id);
-        await expect(verifyPassword(updatedHash(), NEW)).resolves.toBe(true);
+        const [userId, passwordHash] = usersService.resetLocalPassword.mock
+          .calls[0] as [string, string];
+
+        expect(userId).toBe(USER.id);
+        await expect(verifyPassword(passwordHash, NEW)).resolves.toBe(true);
         expect(refreshTokenService.revokeAll).toHaveBeenCalledWith(USER.id);
       });
 
@@ -662,7 +661,7 @@ describe('AuthService', () => {
           }),
         ).rejects.toMatchObject({ code: 2004 });
         expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
-        expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
+        expect(usersService.resetLocalPassword).not.toHaveBeenCalled();
         expect(refreshTokenService.revokeAll).not.toHaveBeenCalled();
       });
 
@@ -675,7 +674,7 @@ describe('AuthService', () => {
           }),
         ).rejects.toMatchObject({ code: 2008 });
         expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
-        expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
+        expect(usersService.resetLocalPassword).not.toHaveBeenCalled();
       });
 
       it('lets only one of two concurrent requests through', async () => {
@@ -688,7 +687,20 @@ describe('AuthService', () => {
             newPassword: NEW,
           }),
         ).rejects.toMatchObject({ code: 2004 });
-        expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
+        expect(usersService.resetLocalPassword).not.toHaveBeenCalled();
+      });
+
+      it('rejects when the user no longer has a local login', async () => {
+        usersService.resetLocalPassword.mockResolvedValue(false);
+
+        await expect(
+          service.resetPassword({
+            uid: USER.id,
+            token: 'token-1',
+            newPassword: NEW,
+          }),
+        ).rejects.toMatchObject({ code: 2004 });
+        expect(refreshTokenService.revokeAll).not.toHaveBeenCalled();
       });
     });
 
@@ -738,18 +750,6 @@ describe('AuthService', () => {
           usersService.findLocalProviderWithPassword,
         ).not.toHaveBeenCalled();
         expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
-      });
-
-      it('rejects a current password that matches only in its first 72 bytes', async () => {
-        const password = 'a'.repeat(72);
-        await mockProviderWithPassword(password);
-
-        await expect(
-          service.changePassword(USER.id, {
-            currentPassword: `${password}b`,
-            newPassword: NEW,
-          }),
-        ).rejects.toMatchObject({ code: 2005 });
       });
 
       it.each([

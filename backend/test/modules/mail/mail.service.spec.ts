@@ -29,6 +29,25 @@ describe('MailService', () => {
     );
   });
 
+  it('links the verification email to the forgot password page', async () => {
+    env.resendApiKey = 're_test';
+    send.mockResolvedValue({ data: { id: '1' }, error: null });
+
+    await new MailService().sendVerificationEmail(
+      'a@example.com',
+      'user-1',
+      'abc-123',
+    );
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining(
+          'href="http://localhost:3000/forgot-password"',
+        ) as string,
+      }),
+    );
+  });
+
   it('links a password reset email to the reset page', async () => {
     const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
 

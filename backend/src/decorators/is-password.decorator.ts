@@ -16,6 +16,7 @@ export const IsPassword = () =>
       message: `Mật khẩu chỉ được tối đa ${PASSWORD_MAX_LENGTH} ký tự`,
     }),
     Matches(PASSWORD_PATTERN, {
-      message: 'Mật khẩu chỉ được gồm chữ cái không dấu và chữ số',
+      message:
+        'Mật khẩu chỉ được gồm chữ cái không dấu, chữ số và ký tự đặc biệt',
     }),
   );

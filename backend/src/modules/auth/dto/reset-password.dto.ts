@@ -2,7 +2,7 @@ import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
 import { IsPassword } from '../../../decorators/is-password.decorator';
 
 export class ResetPasswordDto {
-  @IsUUID('all', { message: 'Mã đặt lại mật khẩu không hợp lệ' })
+  @IsUUID('all', { message: 'Mã người dùng không hợp lệ' })
   uid: string;
 
   @IsString({ message: 'Mã đặt lại mật khẩu không hợp lệ' })

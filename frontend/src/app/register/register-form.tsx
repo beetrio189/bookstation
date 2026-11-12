@@ -9,8 +9,8 @@ import { usePasswordConfirm } from "@/hooks/use-password-confirm";
 // Khớp với RegisterDto của backend
 const NAME_MAX_LENGTH = 100;
 const PASSWORD_MIN_LENGTH = 8;
-const PASSWORD_MAX_LENGTH = 15;
-const PASSWORD_PATTERN = "[a-zA-Z0-9]+";
+const PASSWORD_MAX_LENGTH = 72;
+const PASSWORD_PATTERN = "[!-~]+";
 
 export function RegisterForm() {
   const { passwordRef, confirmRef, check } = usePasswordConfirm();
@@ -57,7 +57,7 @@ export function RegisterForm() {
         minLength={PASSWORD_MIN_LENGTH}
         maxLength={PASSWORD_MAX_LENGTH}
         pattern={PASSWORD_PATTERN}
-        title="8–15 ký tự, chỉ gồm chữ cái không dấu và chữ số"
+        title="8–72 ký tự, chỉ gồm chữ cái không dấu, chữ số và ký tự đặc biệt"
         onChange={check}
         required
       />

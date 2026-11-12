@@ -117,6 +117,34 @@ export class UsersService {
    * Trả về false khi user không còn provider local (ví dụ đã bị job xóa).
    */
   markLocalVerified(userId: string): Promise<boolean> {
+    return this.updateLocalAsVerified(userId, {});
+  }
+
+  /**
+   * Đặt mật khẩu mới qua link quên mật khẩu. Bấm được link trong email cũng
+   * chứng minh sở hữu email như link xác thực, nên xác thực luôn tài khoản.
+   * Trả về false khi user không còn provider local.
+   */
+  resetLocalPassword(userId: string, passwordHash: string): Promise<boolean> {
+    return this.updateLocalAsVerified(userId, { passwordHash });
+  }
+
+  async updateLocalPassword(
+    userId: string,
+    passwordHash: string,
+  ): Promise<void> {
+    await this.providersRepository.update(
+      { userId, provider: IdentityProvider.LOCAL },
+      { passwordHash },
+    );
+  }
+
+  // Cập nhật provider local thành đã xác thực (kèm các cột khác nếu có), và
+  // lấy email đó làm email nhận thông báo nếu email nhận thông báo chưa xác thực
+  private updateLocalAsVerified(
+    userId: string,
+    changes: Partial<Pick<Provider, 'passwordHash'>>,
+  ): Promise<boolean> {
     return this.usersRepository.manager.transaction(async (manager) => {
       const provider = await manager.findOne(Provider, {
         where: { userId, provider: IdentityProvider.LOCAL },
@@ -127,7 +155,11 @@ export class UsersService {
         return false;
       }
 
-      await manager.update(Provider, { id: provider.id }, { verified: true });
+      await manager.update(
+        Provider,
+        { id: provider.id },
+        { ...changes, verified: true },
+      );
       await manager.update(
         User,
         { id: userId, notificationEmailVerified: false },
@@ -139,16 +171,6 @@ export class UsersService {
 
       return true;
     });
-  }
-
-  async updateLocalPassword(
-    userId: string,
-    passwordHash: string,
-  ): Promise<void> {
-    await this.providersRepository.update(
-      { userId, provider: IdentityProvider.LOCAL },
-      { passwordHash },
-    );
   }
 
   async deleteUnverifiedLocalUsers(createdBefore: Date): Promise<number> {

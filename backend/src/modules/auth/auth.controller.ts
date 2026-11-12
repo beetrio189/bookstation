@@ -9,12 +9,13 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { minutes, Throttle } from '@nestjs/throttler';
+import { hours, minutes, Throttle } from '@nestjs/throttler';
 import { randomBytes } from 'crypto';
 import { CookieOptions, Request, Response } from 'express';
 import { env } from '../../config';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import { Public } from '../../decorators/public.decorator';
+import { ThrottleByIpEmail } from '../../decorators/throttle-by-ip-email.decorator';
 import { AppException } from '../../utils/errors/app.exception';
 import { ERRORS } from '../../utils/errors/errors';
 import { AuthUser } from '../../utils/types/auth-user';
@@ -84,7 +85,6 @@ export class AuthController {
   }
 
   @Public()
-  // Chặn dò token theo IP
   @Throttle({ default: { ttl: minutes(1), limit: 20 } })
   @HttpCode(HttpStatus.OK)
   @Post('verify-email')
@@ -93,6 +93,8 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: hours(1), limit: 5 } })
+  @ThrottleByIpEmail({ ttl: hours(1), limit: 2 })
   @HttpCode(HttpStatus.OK)
   @Post('resend-verification')
   resendVerification(@Body() dto: ResendVerificationDto) {
@@ -100,6 +102,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: minutes(1), limit: 10 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(
@@ -125,7 +128,6 @@ export class AuthController {
     response.redirect(this.googleOAuthService.buildAuthUrl(state));
   }
 
-  // Luôn redirect về FE: thành công thì FE gọi /auth/refresh để lấy access token, thất bại thì có ?error=<mã lỗi>
   @Public()
   @Get('google/callback')
   async finishGoogleLogin(

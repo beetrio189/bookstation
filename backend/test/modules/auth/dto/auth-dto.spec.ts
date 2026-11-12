@@ -35,14 +35,16 @@ describe('auth DTOs', () => {
     });
   });
 
-  it.each(['a'.repeat(8), 'Ab1'.repeat(5)])(
-    'accepts the password %s',
-    async (password) => {
-      await expect(
-        validate(RegisterDto, { ...VALID, password }),
-      ).resolves.toBeInstanceOf(RegisterDto);
-    },
-  );
+  it.each([
+    'a'.repeat(8),
+    'a'.repeat(72),
+    'Mat-khau@1',
+    `aA0!"#$%&'()*+,-./:;<=>?@[\\]^_\`{|}~`,
+  ])('accepts the password %s', async (password) => {
+    await expect(
+      validate(RegisterDto, { ...VALID, password }),
+    ).resolves.toBeInstanceOf(RegisterDto);
+  });
 
   it.each([
     ['a missing email', { email: undefined }, 'Email không đúng định dạng'],
@@ -59,19 +61,19 @@ describe('auth DTOs', () => {
       'Mật khẩu phải có ít nhất 8 ký tự',
     ],
     [
-      'a 16-character password',
-      { password: 'a'.repeat(16) },
-      'Mật khẩu chỉ được tối đa 15 ký tự',
+      'a 73-character password',
+      { password: 'a'.repeat(73) },
+      'Mật khẩu chỉ được tối đa 72 ký tự',
     ],
     [
       'a password with Vietnamese letters',
       { password: 'matkhauấ1' },
-      'Mật khẩu chỉ được gồm chữ cái không dấu và chữ số',
+      'Mật khẩu chỉ được gồm chữ cái không dấu, chữ số và ký tự đặc biệt',
     ],
     [
-      'a password with symbols',
-      { password: 'mat-khau-1' },
-      'Mật khẩu chỉ được gồm chữ cái không dấu và chữ số',
+      'a password with a space',
+      { password: 'mat khau 1' },
+      'Mật khẩu chỉ được gồm chữ cái không dấu, chữ số và ký tự đặc biệt',
     ],
     [
       'a blank display name',
@@ -94,16 +96,26 @@ describe('auth DTOs', () => {
     ).rejects.toMatchObject({ code: 1000, message });
   });
 
-  it('does not apply the password rules when logging in', async () => {
+  it('accepts a login and normalizes the email', async () => {
     await expect(
-      validate(LoginDto, { email: ' A@Example.COM ', password: 'ngan' }),
-    ).resolves.toEqual({ email: 'a@example.com', password: 'ngan' });
+      validate(LoginDto, { email: ' A@Example.COM ', password: 'Mat-khau@1' }),
+    ).resolves.toEqual({ email: 'a@example.com', password: 'Mat-khau@1' });
   });
 
   it.each([
-    ['a missing password', {}, 'Vui lòng nhập mật khẩu'],
-    ['an empty password', { password: '' }, 'Vui lòng nhập mật khẩu'],
+    ['a missing password', {}, 'Mật khẩu không hợp lệ'],
+    ['an empty password', { password: '' }, 'Mật khẩu phải có ít nhất 8 ký tự'],
     ['a non-string password', { password: 123 }, 'Mật khẩu không hợp lệ'],
+    [
+      'a 73-character password',
+      { password: 'a'.repeat(73) },
+      'Mật khẩu chỉ được tối đa 72 ký tự',
+    ],
+    [
+      'a password with Vietnamese letters',
+      { password: 'matkhauấ1' },
+      'Mật khẩu chỉ được gồm chữ cái không dấu, chữ số và ký tự đặc biệt',
+    ],
   ])('rejects a login with %s', async (_case, override, message) => {
     await expect(
       validate(LoginDto, { email: VALID.email, ...override }),
@@ -112,16 +124,16 @@ describe('auth DTOs', () => {
 
   it.each([
     ['a missing token', { token: undefined }, 'Thiếu mã đặt lại mật khẩu'],
-    ['a bad uid', { uid: 'abc' }, 'Mã đặt lại mật khẩu không hợp lệ'],
+    ['a bad uid', { uid: 'abc' }, 'Mã người dùng không hợp lệ'],
     [
       'a short password',
       { newPassword: 'ngan' },
       'Mật khẩu phải có ít nhất 8 ký tự',
     ],
     [
-      'a 16-character password',
-      { newPassword: 'a'.repeat(16) },
-      'Mật khẩu chỉ được tối đa 15 ký tự',
+      'a 73-character password',
+      { newPassword: 'a'.repeat(73) },
+      'Mật khẩu chỉ được tối đa 72 ký tự',
     ],
   ])('rejects a password reset with %s', async (_case, override, message) => {
     await expect(
@@ -138,7 +150,12 @@ describe('auth DTOs', () => {
     [
       'a missing current password',
       { currentPassword: undefined },
-      'Vui lòng nhập mật khẩu hiện tại',
+      'Mật khẩu không hợp lệ',
+    ],
+    [
+      'a 73-character current password',
+      { currentPassword: 'a'.repeat(73) },
+      'Mật khẩu chỉ được tối đa 72 ký tự',
     ],
     [
       'a short new password',
