@@ -53,11 +53,26 @@ export class MailService {
       subject: 'Đặt lại mật khẩu BookStation',
       html: `
         <p>Chào bạn,</p>
-        <p>Bấm vào liên kết dưới đây để đặt lại mật khẩu BookStation. Liên kết có hiệu lực trong 30 phút.</p>
+        <p>Bấm vào liên kết dưới đây để đặt lại mật khẩu BookStation. Liên kết có hiệu lực trong 24 giờ.</p>
         <p><a href="${link}">Đặt lại mật khẩu</a></p>
         <p>Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email.</p>
       `,
       devNote: link,
+    });
+  }
+
+  async sendPasswordChangedEmail(to: string): Promise<void> {
+    const forgotPasswordLink = `${env.feUrl}/forgot-password`;
+
+    await this.send({
+      to,
+      subject: 'Mật khẩu BookStation vừa được thay đổi',
+      html: `
+        <p>Chào bạn,</p>
+        <p>Mật khẩu tài khoản BookStation của bạn vừa được đặt lại, mọi thiết bị đã bị đăng xuất.</p>
+        <p>Nếu không phải bạn làm, hãy <a href="${forgotPasswordLink}">đặt lại mật khẩu</a> ngay và liên hệ admin_bookstation@gmail.com.</p>
+      `,
+      devNote: 'mật khẩu vừa được thay đổi',
     });
   }
 

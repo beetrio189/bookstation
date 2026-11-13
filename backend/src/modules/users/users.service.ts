@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { IdentityProvider } from '../../utils/enums/identity-provider.enum';
 import { RoleCode } from '../../utils/enums/role-code.enum';
+import { UserStatus } from '../../utils/enums/user-status.enum';
+import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { Provider } from './entities/provider.entity';
 import { User } from './entities/user.entity';
+
+export type ResetLocalPasswordResult =
+  | { status: 'reset'; email: string }
+  | { status: 'no-local-login' }
+  | { status: 'locked' };
 
 @Injectable()
 export class UsersService {
@@ -117,16 +124,52 @@ export class UsersService {
    * Trả về false khi user không còn provider local (ví dụ đã bị job xóa).
    */
   markLocalVerified(userId: string): Promise<boolean> {
-    return this.updateLocalAsVerified(userId, {});
+    return this.usersRepository.manager.transaction(async (manager) => {
+      const provider = await this.lockLocalProvider(manager, userId);
+
+      if (!provider) {
+        return false;
+      }
+
+      await this.markProviderVerified(manager, provider, {});
+
+      return true;
+    });
   }
 
   /**
-   * Đặt mật khẩu mới qua link quên mật khẩu. Bấm được link trong email cũng
-   * chứng minh sở hữu email như link xác thực, nên xác thực luôn tài khoản.
-   * Trả về false khi user không còn provider local.
+   * Đặt mật khẩu mới qua link quên mật khẩu, trong một transaction:
+   * - Tài khoản bị khóa thì không đổi gì.
+   * - Bấm được link trong email cũng chứng minh sở hữu email như link xác
+   *   thực, nên xác thực luôn tài khoản.
+   * - Xóa mọi refresh token: đổi được mật khẩu thì chắc chắn phiên cũ đã mất.
    */
-  resetLocalPassword(userId: string, passwordHash: string): Promise<boolean> {
-    return this.updateLocalAsVerified(userId, { passwordHash });
+  resetLocalPassword(
+    userId: string,
+    passwordHash: string,
+  ): Promise<ResetLocalPasswordResult> {
+    return this.usersRepository.manager.transaction(async (manager) => {
+      const provider = await this.lockLocalProvider(manager, userId);
+
+      if (!provider) {
+        return { status: 'no-local-login' };
+      }
+
+      // Khóa cả dòng user: admin khóa tài khoản cùng lúc thì một bên phải chờ bên kia
+      const user = await manager.findOne(User, {
+        where: { id: userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (user?.status === UserStatus.LOCKED) {
+        return { status: 'locked' };
+      }
+
+      await this.markProviderVerified(manager, provider, { passwordHash });
+      await manager.delete(RefreshToken, { userId });
+
+      return { status: 'reset', email: provider.providerKey };
+    });
   }
 
   async updateLocalPassword(
@@ -139,38 +182,34 @@ export class UsersService {
     );
   }
 
-  // Cập nhật provider local thành đã xác thực (kèm các cột khác nếu có), và
-  // lấy email đó làm email nhận thông báo nếu email nhận thông báo chưa xác thực
-  private updateLocalAsVerified(
+  private lockLocalProvider(
+    manager: EntityManager,
     userId: string,
-    changes: Partial<Pick<Provider, 'passwordHash'>>,
-  ): Promise<boolean> {
-    return this.usersRepository.manager.transaction(async (manager) => {
-      const provider = await manager.findOne(Provider, {
-        where: { userId, provider: IdentityProvider.LOCAL },
-        lock: { mode: 'pessimistic_write' },
-      });
-
-      if (!provider) {
-        return false;
-      }
-
-      await manager.update(
-        Provider,
-        { id: provider.id },
-        { ...changes, verified: true },
-      );
-      await manager.update(
-        User,
-        { id: userId, notificationEmailVerified: false },
-        {
-          notificationEmail: provider.providerKey,
-          notificationEmailVerified: true,
-        },
-      );
-
-      return true;
+  ): Promise<Provider | null> {
+    return manager.findOne(Provider, {
+      where: { userId, provider: IdentityProvider.LOCAL },
+      lock: { mode: 'pessimistic_write' },
     });
+  }
+  
+  private async markProviderVerified(
+    manager: EntityManager,
+    provider: Provider,
+    changes: Partial<Pick<Provider, 'passwordHash'>>,
+  ): Promise<void> {
+    await manager.update(
+      Provider,
+      { id: provider.id },
+      { ...changes, verified: true },
+    );
+    await manager.update(
+      User,
+      { id: provider.userId, notificationEmailVerified: false },
+      {
+        notificationEmail: provider.providerKey,
+        notificationEmailVerified: true,
+      },
+    );
   }
 
   async deleteUnverifiedLocalUsers(createdBefore: Date): Promise<number> {

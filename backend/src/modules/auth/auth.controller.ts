@@ -200,6 +200,8 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: hours(1), limit: 5 } })
+  @ThrottleByIpEmail({ ttl: hours(1), limit: 2 })
   @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
   forgotPassword(@Body() dto: ForgotPasswordDto) {
@@ -207,6 +209,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: minutes(1), limit: 20 } })
   @HttpCode(HttpStatus.OK)
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {

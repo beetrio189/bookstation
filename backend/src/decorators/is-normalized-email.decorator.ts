@@ -8,5 +8,5 @@ export const IsNormalizedEmail = () =>
       typeof value === 'string' ? value.trim().toLowerCase() : value,
     ),
     IsEmail({}, { message: 'Email không đúng định dạng' }),
-    MaxLength(255, { message: 'Email quá dài' }),
+    MaxLength(254, { message: 'Email quá dài' }),
   );

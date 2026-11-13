@@ -15,4 +15,30 @@ describe('MailQueueService', () => {
       email: 'a@example.com',
     });
   });
+
+  it('queues a password reset email without a token', async () => {
+    const queue = { add: jest.fn() };
+
+    await new MailQueueService(
+      queue as unknown as Queue,
+    ).enqueuePasswordResetEmail('user-1', 'a@example.com');
+
+    expect(queue.add).toHaveBeenCalledWith(MailJob.RESET_PASSWORD, {
+      userId: 'user-1',
+      email: 'a@example.com',
+    });
+  });
+
+  it('queues a password changed email', async () => {
+    const queue = { add: jest.fn() };
+
+    await new MailQueueService(
+      queue as unknown as Queue,
+    ).enqueuePasswordChangedEmail('user-1', 'a@example.com');
+
+    expect(queue.add).toHaveBeenCalledWith(MailJob.PASSWORD_CHANGED, {
+      userId: 'user-1',
+      email: 'a@example.com',
+    });
+  });
 });

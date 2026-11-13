@@ -8,13 +8,14 @@ import {
 import {
   MAIL_QUEUE,
   MailJob,
-  VerifyEmailJobData,
+  MailJobData,
 } from '../modules/mail/mail-queue.constants';
 import { MailService } from '../modules/mail/mail.service';
 
 export const VERIFY_EMAIL_TTL_SECONDS = 24 * 60 * 60;
+export const RESET_PASSWORD_TTL_SECONDS = 24 * 60 * 60;
 
-// Giưới hạn 2req/s cho con resend (đọc trên doc thì hình như max là 10req/s?)
+// Giới hạn 2req/s cho con resend (đọc trên doc thì hình như max là 10req/s?)
 @Processor(MAIL_QUEUE, {
   concurrency: 2,
   limiter: { max: 2, duration: 1000 },
@@ -29,17 +30,21 @@ export class MailProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<VerifyEmailJobData>): Promise<void> {
+  async process(job: Job<MailJobData>): Promise<void> {
     switch (job.name) {
       case MailJob.VERIFY_EMAIL:
         return this.sendVerificationEmail(job.data);
+      case MailJob.RESET_PASSWORD:
+        return this.sendPasswordResetEmail(job.data);
+      case MailJob.PASSWORD_CHANGED:
+        return this.mailService.sendPasswordChangedEmail(job.data.email);
       default:
         throw new Error(`Không có xử lý cho job ${job.name}`);
     }
   }
 
   @OnWorkerEvent('completed')
-  onCompleted(job: Job<VerifyEmailJobData>) {
+  onCompleted(job: Job<MailJobData>) {
     this.logger.log(
       `Job ${job.name} (${job.id}) gửi xong cho user ${job.data.userId}`,
     );
@@ -55,7 +60,7 @@ export class MailProcessor extends WorkerHost {
   private async sendVerificationEmail({
     userId,
     email,
-  }: VerifyEmailJobData): Promise<void> {
+  }: MailJobData): Promise<void> {
     const token = await this.oneTimeTokenService.create(
       OneTimeTokenPurpose.VERIFY_EMAIL,
       userId,
@@ -63,5 +68,18 @@ export class MailProcessor extends WorkerHost {
     );
 
     await this.mailService.sendVerificationEmail(email, userId, token);
+  }
+
+  private async sendPasswordResetEmail({
+    userId,
+    email,
+  }: MailJobData): Promise<void> {
+    const token = await this.oneTimeTokenService.create(
+      OneTimeTokenPurpose.RESET_PASSWORD,
+      userId,
+      RESET_PASSWORD_TTL_SECONDS,
+    );
+
+    await this.mailService.sendPasswordResetEmail(email, userId, token);
   }
 }

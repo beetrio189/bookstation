@@ -11,7 +11,6 @@ import {
 } from '../../utils/password';
 import { JwtPayload } from '../../utils/types/jwt-payload';
 import { MailQueueService } from '../mail/mail-queue.service';
-import { MailService } from '../mail/mail.service';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -26,7 +25,6 @@ import {
 } from './one-time-token.service';
 import { RefreshTokenService } from './refresh-token.service';
 
-const RESET_PASSWORD_TTL_SECONDS = 30 * 60;
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 const MAX_NAME_LENGTH = 100;
 
@@ -42,7 +40,6 @@ export class AuthService {
 
   constructor(
     private readonly usersService: UsersService,
-    private readonly mailService: MailService,
     private readonly oneTimeTokenService: OneTimeTokenService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly jwtService: JwtService,
@@ -149,7 +146,7 @@ export class AuthService {
     const provider = await this.usersService.findLocalProvider(email);
 
     if (provider && !isLocked(provider.user)) {
-      void this.sendPasswordResetEmail(provider.userId, email);
+      void this.enqueuePasswordResetEmail(provider.userId, email);
     }
   }
 
@@ -158,27 +155,7 @@ export class AuthService {
     token,
     newPassword,
   }: ResetPasswordDto): Promise<void> {
-    // Chỉ xem trước, để nhập trùng mật khẩu cũ thì vẫn dùng lại được link
-    const isValid = await this.oneTimeTokenService.peek(
-      OneTimeTokenPurpose.RESET_PASSWORD,
-      uid,
-      token,
-    );
-
-    if (!isValid) {
-      throw new AppException(ERRORS.INVALID_TOKEN);
-    }
-
-    const provider = await this.usersService.findLocalProviderWithPassword(uid);
-
-    if (
-      provider?.passwordHash &&
-      (await verifyPassword(provider.passwordHash, newPassword))
-    ) {
-      throw new AppException(ERRORS.SAME_PASSWORD);
-    }
-
-    // Hai request cùng lúc với một token thì chỉ một request được đi tiếp
+    // Lua GET + DEL nguyên tử: hai request cùng lúc với một token thì chỉ một request đi tiếp
     const isConsumed = await this.oneTimeTokenService.consume(
       OneTimeTokenPurpose.RESET_PASSWORD,
       uid,
@@ -189,16 +166,21 @@ export class AuthService {
       throw new AppException(ERRORS.INVALID_TOKEN);
     }
 
-    const isUpdated = await this.usersService.resetLocalPassword(
+    // Kiểm tra khóa sau token: ai biết uid cũng không dò được tài khoản bị khóa
+    const result = await this.usersService.resetLocalPassword(
       uid,
       await hashPassword(newPassword),
     );
 
-    if (!isUpdated) {
+    if (result.status === 'no-local-login') {
       throw new AppException(ERRORS.INVALID_TOKEN);
     }
 
-    await this.refreshTokenService.revokeAll(uid);
+    if (result.status === 'locked') {
+      throw new AppException(ERRORS.ACCOUNT_LOCKED);
+    }
+
+    await this.enqueuePasswordChangedEmail(uid, result.email);
   }
 
   async changePassword(
@@ -317,18 +299,23 @@ export class AuthService {
     }
   }
 
-  private async sendPasswordResetEmail(
+  private async enqueuePasswordResetEmail(
     userId: string,
     email: string,
   ): Promise<void> {
     try {
-      const token = await this.oneTimeTokenService.create(
-        OneTimeTokenPurpose.RESET_PASSWORD,
-        userId,
-        RESET_PASSWORD_TTL_SECONDS,
-      );
+      await this.mailQueueService.enqueuePasswordResetEmail(userId, email);
+    } catch (error) {
+      this.logger.error(error);
+    }
+  }
 
-      await this.mailService.sendPasswordResetEmail(email, userId, token);
+  private async enqueuePasswordChangedEmail(
+    userId: string,
+    email: string,
+  ): Promise<void> {
+    try {
+      await this.mailQueueService.enqueuePasswordChangedEmail(userId, email);
     } catch (error) {
       this.logger.error(error);
     }
