@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'crypto';
-import { LessThanOrEqual, Repository } from 'typeorm';
+import { LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { RefreshToken } from './entities/refresh-token.entity';
 
 export const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -28,17 +28,17 @@ export class RefreshTokenService {
     return token;
   }
 
-  async consume(token: string): Promise<string | null> {
-    const { raw } = await this.refreshTokensRepository
-      .createQueryBuilder()
-      .delete()
-      .where('token_hash = :tokenHash AND expires_at > now()', {
-        tokenHash: hashToken(token),
-      })
-      .returning('user_id')
-      .execute();
+  async findUserId(token: string): Promise<string | null> {
+    const row = await this.refreshTokensRepository.findOne({
+      select: { userId: true },
+      where: { tokenHash: hashToken(token), expiresAt: MoreThan(new Date()) },
+    });
 
-    return (raw as { user_id: string }[])[0]?.user_id ?? null;
+    return row?.userId ?? null;
+  }
+
+  async revoke(token: string): Promise<void> {
+    await this.refreshTokensRepository.delete({ tokenHash: hashToken(token) });
   }
 
   async deleteExpired(now = new Date()): Promise<number> {

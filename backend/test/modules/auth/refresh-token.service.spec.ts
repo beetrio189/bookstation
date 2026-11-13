@@ -1,23 +1,15 @@
 import { createHash } from 'crypto';
-import { LessThanOrEqual, Repository } from 'typeorm';
+import { LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { RefreshToken } from '../../../src/modules/auth/entities/refresh-token.entity';
 import { RefreshTokenService } from '../../../src/modules/auth/refresh-token.service';
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 describe('RefreshTokenService', () => {
-  const execute = jest.fn();
-  const where = jest.fn();
-  const builder = {
-    delete: () => builder,
-    where,
-    returning: () => builder,
-    execute,
-  };
   const repository = {
     insert: jest.fn(),
     delete: jest.fn(),
-    createQueryBuilder: () => builder,
+    findOne: jest.fn(),
   };
   const service = new RefreshTokenService(
     repository as unknown as Repository<RefreshToken>,
@@ -25,7 +17,6 @@ describe('RefreshTokenService', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    where.mockReturnValue(builder);
   });
 
   it('stores only the hash of a new token, valid for 30 days', async () => {
@@ -65,19 +56,32 @@ describe('RefreshTokenService', () => {
     );
   });
 
-  it('consumes by hash and returns the user id', async () => {
-    execute.mockResolvedValue({ raw: [{ user_id: 'user-1' }] });
+  it('finds the user of an unexpired token by hash, without deleting it', async () => {
+    repository.findOne.mockResolvedValue({ userId: 'user-1' });
 
-    await expect(service.consume('token')).resolves.toBe('user-1');
-    expect(where).toHaveBeenCalledWith(expect.any(String), {
-      tokenHash: createHash('sha256').update('token').digest('hex'),
+    await expect(service.findUserId('token')).resolves.toBe('user-1');
+    expect(repository.findOne).toHaveBeenCalledWith({
+      select: { userId: true },
+      where: {
+        tokenHash: createHash('sha256').update('token').digest('hex'),
+        expiresAt: MoreThan(expect.any(Date)),
+      },
     });
+    expect(repository.delete).not.toHaveBeenCalled();
   });
 
-  it('returns null for an unknown, used or expired token', async () => {
-    execute.mockResolvedValue({ raw: [] });
+  it('returns null for an unknown, revoked or expired token', async () => {
+    repository.findOne.mockResolvedValue(null);
 
-    await expect(service.consume('token')).resolves.toBeNull();
+    await expect(service.findUserId('token')).resolves.toBeNull();
+  });
+
+  it('revokes a token by hash', async () => {
+    await service.revoke('token');
+
+    expect(repository.delete).toHaveBeenCalledWith({
+      tokenHash: createHash('sha256').update('token').digest('hex'),
+    });
   });
 
   it('revokes every token of the user', async () => {

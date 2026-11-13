@@ -40,7 +40,9 @@ describe('AuthController', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     authService.login.mockResolvedValue(TOKENS);
-    authService.refresh.mockResolvedValue(TOKENS);
+    authService.refresh.mockResolvedValue({
+      accessToken: TOKENS.accessToken,
+    });
     authService.loginWithGoogle.mockResolvedValue(TOKENS);
   });
 
@@ -59,20 +61,47 @@ describe('AuthController', () => {
     );
   });
 
-  it('rotates the cookie on refresh', async () => {
+  it('returns a new access token and leaves the cookie alone on refresh', async () => {
     await expect(
       controller.refresh(
-        requestWith({ refresh_token: 'old' }),
+        requestWith({ refresh_token: 'current' }),
         response as unknown as Response,
       ),
     ).resolves.toEqual({ accessToken: TOKENS.accessToken });
 
-    expect(authService.refresh).toHaveBeenCalledWith('old');
-    expect(response.cookie).toHaveBeenCalledWith(
+    expect(authService.refresh).toHaveBeenCalledWith('current');
+    expect(response.cookie).not.toHaveBeenCalled();
+    expect(response.clearCookie).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an invalid or expired token', ERRORS.UNAUTHENTICATED],
+    ['a locked account', ERRORS.ACCOUNT_LOCKED],
+  ])('clears the cookie on refresh with %s', async (_case, error) => {
+    authService.refresh.mockRejectedValue(new AppException(error));
+
+    await expect(
+      controller.refresh(
+        requestWith({ refresh_token: 'current' }),
+        response as unknown as Response,
+      ),
+    ).rejects.toMatchObject({ code: error.code });
+    expect(response.clearCookie).toHaveBeenCalledWith(
       'refresh_token',
-      TOKENS.refreshToken,
-      { ...COOKIE_OPTIONS, maxAge: 2592000000 },
+      COOKIE_OPTIONS,
     );
+  });
+
+  it('keeps the cookie when refresh fails for an unexpected reason', async () => {
+    authService.refresh.mockRejectedValue(new Error('db down'));
+
+    await expect(
+      controller.refresh(
+        requestWith({ refresh_token: 'current' }),
+        response as unknown as Response,
+      ),
+    ).rejects.toThrow('db down');
+    expect(response.clearCookie).not.toHaveBeenCalled();
   });
 
   it('ignores a cookie that was parsed into an object', async () => {

@@ -58,7 +58,8 @@ describe('AuthService', () => {
   };
   const refreshTokenService = {
     create: jest.fn(),
-    consume: jest.fn(),
+    findUserId: jest.fn(),
+    revoke: jest.fn(),
     revokeAll: jest.fn(),
   };
   const jwtService = { signAsync: jest.fn() };
@@ -454,54 +455,58 @@ describe('AuthService', () => {
     });
 
     describe('refresh', () => {
-      it('consumes the old token and issues new ones with the latest role', async () => {
-        refreshTokenService.consume.mockResolvedValue(USER.id);
+      it('signs a new access token with the latest role and keeps the refresh token', async () => {
+        refreshTokenService.findUserId.mockResolvedValue(USER.id);
         usersService.findById.mockResolvedValue({
           ...USER,
           role: 'publisher',
         });
 
-        await expect(service.refresh('old')).resolves.toEqual(TOKENS);
+        await expect(service.refresh('current')).resolves.toEqual({
+          accessToken: TOKENS.accessToken,
+        });
 
-        expect(refreshTokenService.consume).toHaveBeenCalledWith('old');
+        expect(refreshTokenService.findUserId).toHaveBeenCalledWith('current');
         expect(jwtService.signAsync).toHaveBeenCalledWith({
           sub: USER.id,
           role: 'publisher',
         });
+        expect(refreshTokenService.create).not.toHaveBeenCalled();
+        expect(refreshTokenService.revoke).not.toHaveBeenCalled();
       });
 
       it('rejects a missing cookie', async () => {
         await expect(service.refresh(undefined)).rejects.toMatchObject({
           code: 1001,
         });
-        expect(refreshTokenService.consume).not.toHaveBeenCalled();
+        expect(refreshTokenService.findUserId).not.toHaveBeenCalled();
       });
 
-      it('rejects an invalid or used token', async () => {
-        refreshTokenService.consume.mockResolvedValue(null);
+      it('rejects an invalid or expired token', async () => {
+        refreshTokenService.findUserId.mockResolvedValue(null);
 
-        await expect(service.refresh('used')).rejects.toMatchObject({
+        await expect(service.refresh('expired')).rejects.toMatchObject({
           code: 1001,
         });
       });
 
       it('rejects a user that no longer exists', async () => {
-        refreshTokenService.consume.mockResolvedValue(USER.id);
+        refreshTokenService.findUserId.mockResolvedValue(USER.id);
         usersService.findById.mockResolvedValue(null);
 
-        await expect(service.refresh('old')).rejects.toMatchObject({
+        await expect(service.refresh('current')).rejects.toMatchObject({
           code: 1001,
         });
       });
 
-      it('rejects a locked user without issuing tokens', async () => {
-        refreshTokenService.consume.mockResolvedValue(USER.id);
+      it('rejects a locked user without signing a token', async () => {
+        refreshTokenService.findUserId.mockResolvedValue(USER.id);
         usersService.findById.mockResolvedValue(LOCKED_USER);
 
-        await expect(service.refresh('old')).rejects.toMatchObject({
+        await expect(service.refresh('current')).rejects.toMatchObject({
           code: 2003,
         });
-        expect(refreshTokenService.create).not.toHaveBeenCalled();
+        expect(jwtService.signAsync).not.toHaveBeenCalled();
       });
     });
 
@@ -509,12 +514,12 @@ describe('AuthService', () => {
       it('deletes the current refresh token', async () => {
         await service.logout('current');
 
-        expect(refreshTokenService.consume).toHaveBeenCalledWith('current');
+        expect(refreshTokenService.revoke).toHaveBeenCalledWith('current');
       });
 
       it('succeeds without a cookie', async () => {
         await expect(service.logout(undefined)).resolves.toBeUndefined();
-        expect(refreshTokenService.consume).not.toHaveBeenCalled();
+        expect(refreshTokenService.revoke).not.toHaveBeenCalled();
       });
     });
 

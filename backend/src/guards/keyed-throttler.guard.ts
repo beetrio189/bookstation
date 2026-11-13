@@ -9,36 +9,36 @@ import { ThrottlerException, ThrottlerStorage } from '@nestjs/throttler';
 import { createHash } from 'crypto';
 import { Request, Response } from 'express';
 
-export const IP_EMAIL_THROTTLE_KEY = 'ip-email-throttle';
-const THROTTLER_NAME = 'ip-email';
+export const KEYED_THROTTLE_KEY = 'keyed-throttle';
 
-export interface IpEmailThrottleOptions {
+export interface KeyedThrottleOptions {
+  name: string;
   limit: number;
   ttl: number;
+  getKey: (request: Request) => string | undefined;
 }
 
 /**
- * Giới hạn theo cặp IP + email trong body, dùng chung bộ đếm Redis với
- * ThrottlerGuard. Giới hạn theo IP thì vẫn để ThrottlerGuard toàn cục lo.
+ * Giới hạn theo một key lấy từ request (IP + email, refresh token...), dùng
+ * chung bộ đếm Redis với ThrottlerGuard. Giới hạn theo IP thì vẫn để
+ * ThrottlerGuard toàn cục lo.
  */
 @Injectable()
-export class IpEmailThrottlerGuard implements CanActivate {
+export class KeyedThrottlerGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @Inject(ThrottlerStorage) private readonly storage: ThrottlerStorage,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const options = this.reflector.get<IpEmailThrottleOptions | undefined>(
-      IP_EMAIL_THROTTLE_KEY,
+    const options = this.reflector.get<KeyedThrottleOptions | undefined>(
+      KEYED_THROTTLE_KEY,
       context.getHandler(),
     );
     const http = context.switchToHttp();
-    const request = http.getRequest<Request>();
-    const email = (request.body as { email?: unknown } | undefined)?.email;
+    const value = options?.getKey(http.getRequest<Request>());
 
-    // Guard chạy trước ValidationPipe: email sai kiểu thì để pipe báo lỗi
-    if (!options || typeof email !== 'string') {
+    if (!options || value === undefined) {
       return true;
     }
 
@@ -47,8 +47,8 @@ export class IpEmailThrottlerGuard implements CanActivate {
         [
           context.getClass().name,
           context.getHandler().name,
-          request.ip,
-          email.trim().toLowerCase(),
+          options.name,
+          value,
         ].join(':'),
       )
       .digest('hex');
@@ -57,7 +57,7 @@ export class IpEmailThrottlerGuard implements CanActivate {
       options.ttl,
       options.limit,
       options.ttl,
-      THROTTLER_NAME,
+      options.name,
     );
 
     if (isBlocked) {

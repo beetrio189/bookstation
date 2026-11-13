@@ -125,7 +125,7 @@ export class AuthService {
 
   async refresh(refreshToken: string | undefined) {
     const userId =
-      refreshToken && (await this.refreshTokenService.consume(refreshToken));
+      refreshToken && (await this.refreshTokenService.findUserId(refreshToken));
     const user = userId ? await this.usersService.findById(userId) : null;
 
     if (!user) {
@@ -136,12 +136,12 @@ export class AuthService {
       throw new AppException(ERRORS.ACCOUNT_LOCKED);
     }
 
-    return this.issueTokens(user);
+    return { accessToken: await this.signAccessToken(user) };
   }
 
   async logout(refreshToken: string | undefined): Promise<void> {
     if (refreshToken) {
-      await this.refreshTokenService.consume(refreshToken);
+      await this.refreshTokenService.revoke(refreshToken);
     }
   }
 
@@ -245,15 +245,16 @@ export class AuthService {
   }
 
   private async issueTokens(user: User) {
-    const payload: JwtPayload = {
-      sub: user.id,
-      role: user.role,
-    };
-
     return {
-      accessToken: await this.jwtService.signAsync(payload),
+      accessToken: await this.signAccessToken(user),
       refreshToken: await this.refreshTokenService.create(user.id),
     };
+  }
+
+  private signAccessToken(user: User): Promise<string> {
+    const payload: JwtPayload = { sub: user.id, role: user.role };
+
+    return this.jwtService.signAsync(payload);
   }
 
   private async findOrCreateGoogleUser({

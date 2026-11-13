@@ -9,13 +9,14 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { hours, minutes, Throttle } from '@nestjs/throttler';
+import { hours, minutes, seconds, Throttle } from '@nestjs/throttler';
 import { randomBytes } from 'crypto';
 import { CookieOptions, Request, Response } from 'express';
 import { env } from '../../config';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import { Public } from '../../decorators/public.decorator';
 import { ThrottleByIpEmail } from '../../decorators/throttle-by-ip-email.decorator';
+import { ThrottleByKey } from '../../decorators/throttle-by-key.decorator';
 import { AppException } from '../../utils/errors/app.exception';
 import { ERRORS } from '../../utils/errors/errors';
 import { AuthUser } from '../../utils/types/auth-user';
@@ -162,19 +163,28 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: seconds(1), limit: 10 } })
+  @ThrottleByKey({
+    name: 'refresh-token',
+    ttl: seconds(1),
+    limit: 4,
+    getKey: readRefreshToken,
+  })
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const { accessToken, refreshToken } = await this.authService.refresh(
-      readRefreshToken(request),
-    );
+    try {
+      return await this.authService.refresh(readRefreshToken(request));
+    } catch (error) {
+      if (error instanceof AppException) {
+        response.clearCookie(REFRESH_COOKIE, REFRESH_COOKIE_OPTIONS);
+      }
 
-    setRefreshCookie(response, refreshToken);
-
-    return { accessToken };
+      throw error;
+    }
   }
 
   @Public()
