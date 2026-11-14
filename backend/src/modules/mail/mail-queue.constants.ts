@@ -10,3 +10,7 @@ export interface MailJobData {
   userId: string;
   email: string;
 }
+
+export interface PasswordChangedJobData extends MailJobData {
+  changedAt: string;
+}

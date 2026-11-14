@@ -21,7 +21,6 @@ describe('AuthController', () => {
     refresh: jest.fn(),
     logout: jest.fn(),
     changePassword: jest.fn(),
-    getProfile: jest.fn(),
     loginWithGoogle: jest.fn(),
   };
   const googleOAuthService = { buildAuthUrl: jest.fn() };
@@ -153,12 +152,6 @@ describe('AuthController', () => {
       ),
     ).rejects.toThrow('wrong');
     expect(response.clearCookie).not.toHaveBeenCalled();
-  });
-
-  it('reads the profile of the current user', async () => {
-    await controller.me({ id: 'user-1' } as AuthUser);
-
-    expect(authService.getProfile).toHaveBeenCalledWith('user-1');
   });
 
   describe('Google login', () => {

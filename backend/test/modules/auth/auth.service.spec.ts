@@ -40,7 +40,7 @@ describe('AuthService', () => {
     findLocalProviderWithPassword: jest.fn(),
     createReader: jest.fn(),
     markLocalVerified: jest.fn(),
-    updateLocalPassword: jest.fn(),
+    changeLocalPassword: jest.fn(),
     resetLocalPassword: jest.fn(),
     findGoogleProvider: jest.fn(),
     createGoogleReader: jest.fn(),
@@ -520,36 +520,11 @@ describe('AuthService', () => {
         expect(refreshTokenService.revoke).not.toHaveBeenCalled();
       });
     });
-
-    describe('getProfile', () => {
-      it('returns the profile without sensitive fields', async () => {
-        usersService.findById.mockResolvedValue(USER);
-
-        await expect(service.getProfile(USER.id)).resolves.toEqual({
-          id: USER.id,
-          name: USER.name,
-          notificationEmail: EMAIL,
-          avatarUrl: null,
-          bio: null,
-          role: 'reader',
-        });
-      });
-
-      it('rejects a user that no longer exists', async () => {
-        usersService.findById.mockResolvedValue(null);
-
-        await expect(service.getProfile(USER.id)).rejects.toMatchObject({
-          code: 1001,
-        });
-      });
-    });
   });
 
   describe('passwords', () => {
     const CURRENT = 'mat-khau-cu';
     const NEW = 'mat-khau-moi';
-    const updatedHash = () =>
-      (usersService.updateLocalPassword.mock.calls[0] as [string, string])[1];
 
     describe('forgotPassword', () => {
       it('queues the reset email without creating a token itself', async () => {
@@ -701,51 +676,53 @@ describe('AuthService', () => {
     });
 
     describe('changePassword', () => {
-      const mockProviderWithPassword = async (password: string) =>
+      const CHANGE = { currentPassword: CURRENT, newPassword: NEW };
+      let currentHash: string;
+
+      beforeEach(async () => {
+        currentHash = await hashPassword(CURRENT);
         usersService.findLocalProviderWithPassword.mockResolvedValue({
           ...PROVIDER,
-          passwordHash: await hashPassword(password),
+          passwordHash: currentHash,
         });
-
-      it('sets the new password and revokes all sessions', async () => {
-        await mockProviderWithPassword(CURRENT);
-
-        await service.changePassword(USER.id, {
-          currentPassword: CURRENT,
-          newPassword: NEW,
+        usersService.changeLocalPassword.mockResolvedValue({
+          status: 'changed',
+          email: EMAIL,
         });
-
-        expect(usersService.findLocalProviderWithPassword).toHaveBeenCalledWith(
-          USER.id,
-        );
-        await expect(verifyPassword(updatedHash(), NEW)).resolves.toBe(true);
-        expect(refreshTokenService.revokeAll).toHaveBeenCalledWith(USER.id);
       });
 
-      it('rejects a wrong current password and changes nothing', async () => {
-        await mockProviderWithPassword(CURRENT);
+      it('changes the password and emails the user', async () => {
+        await service.changePassword(USER.id, CHANGE);
 
+        const [userId, checkedHash, newHash] = usersService.changeLocalPassword
+          .mock.calls[0] as [string, string, string];
+
+        expect(userId).toBe(USER.id);
+        expect(checkedHash).toBe(currentHash);
+        await expect(verifyPassword(newHash, NEW)).resolves.toBe(true);
+        expect(
+          mailQueueService.enqueuePasswordChangedEmail,
+        ).toHaveBeenCalledWith(USER.id, EMAIL);
+      });
+
+      it('rejects a wrong current password before checking the new one', async () => {
         await expect(
           service.changePassword(USER.id, {
             currentPassword: 'mat-khau-sai',
-            newPassword: NEW,
+            newPassword: 'mat-khau-sai',
           }),
         ).rejects.toMatchObject({ code: 2005 });
-        expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
-        expect(refreshTokenService.revokeAll).not.toHaveBeenCalled();
+        expect(usersService.changeLocalPassword).not.toHaveBeenCalled();
       });
 
-      it('rejects a new password equal to the current one before any lookup', async () => {
+      it('rejects a new password equal to the current one', async () => {
         await expect(
           service.changePassword(USER.id, {
             currentPassword: CURRENT,
             newPassword: CURRENT,
           }),
         ).rejects.toMatchObject({ code: 2008 });
-        expect(
-          usersService.findLocalProviderWithPassword,
-        ).not.toHaveBeenCalled();
-        expect(usersService.updateLocalPassword).not.toHaveBeenCalled();
+        expect(usersService.changeLocalPassword).not.toHaveBeenCalled();
       });
 
       it.each([
@@ -755,11 +732,44 @@ describe('AuthService', () => {
         usersService.findLocalProviderWithPassword.mockResolvedValue(provider);
 
         await expect(
-          service.changePassword(USER.id, {
-            currentPassword: CURRENT,
-            newPassword: NEW,
-          }),
+          service.changePassword(USER.id, CHANGE),
         ).rejects.toMatchObject({ code: 2006 });
+      });
+
+      it('rejects with WRONG_PASSWORD when the password changed meanwhile', async () => {
+        usersService.changeLocalPassword.mockResolvedValue({
+          status: 'password-changed-meanwhile',
+        });
+
+        await expect(
+          service.changePassword(USER.id, CHANGE),
+        ).rejects.toMatchObject({ code: 2005 });
+        expect(
+          mailQueueService.enqueuePasswordChangedEmail,
+        ).not.toHaveBeenCalled();
+      });
+
+      it('rejects a locked account', async () => {
+        usersService.changeLocalPassword.mockResolvedValue({
+          status: 'locked',
+        });
+
+        await expect(
+          service.changePassword(USER.id, CHANGE),
+        ).rejects.toMatchObject({ code: 2003 });
+        expect(
+          mailQueueService.enqueuePasswordChangedEmail,
+        ).not.toHaveBeenCalled();
+      });
+
+      it('keeps the new password when the email cannot be queued', async () => {
+        const failure = new Error('Redis: down');
+        mailQueueService.enqueuePasswordChangedEmail.mockRejectedValue(failure);
+
+        await expect(
+          service.changePassword(USER.id, CHANGE),
+        ).resolves.toBeUndefined();
+        expect(Logger.prototype.error).toHaveBeenCalledWith(failure);
       });
     });
   });

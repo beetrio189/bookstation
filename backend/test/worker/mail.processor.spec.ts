@@ -68,10 +68,16 @@ describe('MailProcessor', () => {
   });
 
   it('sends the password changed email without a token', async () => {
-    await processor.process(job(MailJob.PASSWORD_CHANGED, DATA));
+    await processor.process(
+      job(MailJob.PASSWORD_CHANGED, {
+        ...DATA,
+        changedAt: '2026-11-14T03:00:00.000Z',
+      } as MailJobData),
+    );
 
     expect(mailService.sendPasswordChangedEmail).toHaveBeenCalledWith(
       'a@example.com',
+      new Date('2026-11-14T03:00:00.000Z'),
     );
     expect(oneTimeTokenService.create).not.toHaveBeenCalled();
   });

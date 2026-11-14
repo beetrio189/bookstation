@@ -39,6 +39,7 @@ describe('MailQueueService', () => {
     expect(queue.add).toHaveBeenCalledWith(MailJob.PASSWORD_CHANGED, {
       userId: 'user-1',
       email: 'a@example.com',
+      changedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as string,
     });
   });
 });

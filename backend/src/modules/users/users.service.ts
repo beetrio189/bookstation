@@ -4,9 +4,16 @@ import { EntityManager, Repository } from 'typeorm';
 import { IdentityProvider } from '../../utils/enums/identity-provider.enum';
 import { RoleCode } from '../../utils/enums/role-code.enum';
 import { UserStatus } from '../../utils/enums/user-status.enum';
+import { AppException } from '../../utils/errors/app.exception';
+import { ERRORS } from '../../utils/errors/errors';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { Provider } from './entities/provider.entity';
 import { User } from './entities/user.entity';
+
+export type ChangeLocalPasswordResult =
+  | { status: 'changed'; email: string }
+  | { status: 'password-changed-meanwhile' }
+  | { status: 'locked' };
 
 export type ResetLocalPasswordResult =
   | { status: 'reset'; email: string }
@@ -24,6 +31,36 @@ export class UsersService {
 
   findById(id: string): Promise<User | null> {
     return this.usersRepository.findOneBy({ id });
+  }
+
+  async findStatus(id: string): Promise<UserStatus | null> {
+    const user = await this.usersRepository.findOne({
+      select: { id: true, status: true },
+      where: { id },
+    });
+
+    return user?.status ?? null;
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: { providers: true },
+    });
+
+    if (!user) {
+      throw new AppException(ERRORS.UNAUTHENTICATED);
+    }
+
+    return {
+      id: user.id,
+      name: user.name,
+      notificationEmail: user.notificationEmail,
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
+      role: user.role,
+      providers: [...new Set(user.providers.map(({ provider }) => provider))],
+    };
   }
 
   findLocalProvider(email: string): Promise<Provider | null> {
@@ -172,14 +209,45 @@ export class UsersService {
     });
   }
 
-  async updateLocalPassword(
+  /**
+   * Đổi mật khẩu khi đã đăng nhập. Mật khẩu hiện tại đã được kiểm tra ở ngoài
+   * (bcrypt chậm, không giữ khóa lúc so). Trong transaction chỉ so lại hash:
+   * khác hash lúc kiểm tra tức là có người vừa đổi/đặt lại mật khẩu.
+   */
+  changeLocalPassword(
     userId: string,
-    passwordHash: string,
-  ): Promise<void> {
-    await this.providersRepository.update(
-      { userId, provider: IdentityProvider.LOCAL },
-      { passwordHash },
-    );
+    checkedPasswordHash: string,
+    newPasswordHash: string,
+  ): Promise<ChangeLocalPasswordResult> {
+    return this.usersRepository.manager.transaction(async (manager) => {
+      const provider = await manager.findOne(Provider, {
+        select: { id: true, providerKey: true, passwordHash: true },
+        where: { userId, provider: IdentityProvider.LOCAL },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (provider?.passwordHash !== checkedPasswordHash) {
+        return { status: 'password-changed-meanwhile' };
+      }
+
+      const user = await manager.findOne(User, {
+        where: { id: userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (user?.status === UserStatus.LOCKED) {
+        return { status: 'locked' };
+      }
+
+      await manager.update(
+        Provider,
+        { id: provider.id },
+        { passwordHash: newPasswordHash },
+      );
+      await manager.delete(RefreshToken, { userId });
+
+      return { status: 'changed', email: provider.providerKey };
+    });
   }
 
   private lockLocalProvider(
@@ -191,7 +259,7 @@ export class UsersService {
       lock: { mode: 'pessimistic_write' },
     });
   }
-  
+
   private async markProviderVerified(
     manager: EntityManager,
     provider: Provider,

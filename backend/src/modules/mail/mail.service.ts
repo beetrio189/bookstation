@@ -61,18 +61,21 @@ export class MailService {
     });
   }
 
-  async sendPasswordChangedEmail(to: string): Promise<void> {
+  async sendPasswordChangedEmail(to: string, changedAt: Date): Promise<void> {
     const forgotPasswordLink = `${env.feUrl}/forgot-password`;
+    const time = changedAt.toLocaleString('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+    });
 
     await this.send({
       to,
       subject: 'Mật khẩu BookStation vừa được thay đổi',
       html: `
         <p>Chào bạn,</p>
-        <p>Mật khẩu tài khoản BookStation của bạn vừa được đặt lại, mọi thiết bị đã bị đăng xuất.</p>
-        <p>Nếu không phải bạn làm, hãy <a href="${forgotPasswordLink}">đặt lại mật khẩu</a> ngay và liên hệ admin_bookstation@gmail.com.</p>
+        <p>Mật khẩu tài khoản BookStation của bạn vừa được thay đổi lúc ${time} (giờ Việt Nam). Mọi thiết bị đã bị đăng xuất.</p>
+        <p>Nếu không phải bạn, hãy dùng chức năng <a href="${forgotPasswordLink}">Quên mật khẩu</a> ngay và liên hệ admin_bookstation@gmail.com.</p>
       `,
-      devNote: 'mật khẩu vừa được thay đổi',
+      devNote: `mật khẩu vừa được thay đổi lúc ${time}`,
     });
   }
 

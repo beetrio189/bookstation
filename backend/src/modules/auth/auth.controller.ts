@@ -216,6 +216,12 @@ export class AuthController {
     return this.authService.resetPassword(dto);
   }
 
+  @ThrottleByKey({
+    name: 'user',
+    ttl: seconds(30),
+    limit: 1,
+    getKey: (request) => (request as Request & { user?: AuthUser }).user?.id,
+  })
   @HttpCode(HttpStatus.OK)
   @Post('change-password')
   async changePassword(
@@ -226,10 +232,5 @@ export class AuthController {
     await this.authService.changePassword(user.id, dto);
 
     response.clearCookie(REFRESH_COOKIE, REFRESH_COOKIE_OPTIONS);
-  }
-
-  @Get('me')
-  me(@CurrentUser() user: AuthUser) {
-    return this.authService.getProfile(user.id);
   }
 }

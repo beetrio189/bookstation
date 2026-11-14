@@ -78,7 +78,7 @@ export const ERRORS = {
     code: 2006,
     status: HttpStatus.BAD_REQUEST,
     message:
-      'Tài khoản chưa có mật khẩu, vui lòng dùng chức năng quên mật khẩu để tạo',
+      'Tài khoản này chưa có mật khẩu.'
   },
   GOOGLE_AUTH_FAILED: {
     code: 2007,

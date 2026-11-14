@@ -3,6 +3,8 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { UsersService } from '../modules/users/users.service';
+import { UserStatus } from '../utils/enums/user-status.enum';
 import { AppException } from '../utils/errors/app.exception';
 import { ERRORS } from '../utils/errors/errors';
 import { AuthUser } from '../utils/types/auth-user';
@@ -18,6 +20,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly jwtService: JwtService,
+    private readonly usersService: UsersService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -39,15 +42,25 @@ export class JwtAuthGuard implements CanActivate {
       throw new AppException(ERRORS.UNAUTHENTICATED);
     }
 
+    let payload: JwtPayload;
+
     try {
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
-      request.user = {
-        id: payload.sub,
-        role: payload.role,
-      };
+      payload = await this.jwtService.verifyAsync<JwtPayload>(token);
     } catch {
       throw new AppException(ERRORS.UNAUTHENTICATED);
     }
+
+    const status = await this.usersService.findStatus(payload.sub);
+
+    if (!status) {
+      throw new AppException(ERRORS.UNAUTHENTICATED);
+    }
+
+    if (status === UserStatus.LOCKED) {
+      throw new AppException(ERRORS.ACCOUNT_LOCKED);
+    }
+
+    request.user = { id: payload.sub, role: payload.role };
 
     return true;
   }

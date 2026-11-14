@@ -9,6 +9,7 @@ import {
   MAIL_QUEUE,
   MailJob,
   MailJobData,
+  PasswordChangedJobData,
 } from '../modules/mail/mail-queue.constants';
 import { MailService } from '../modules/mail/mail.service';
 
@@ -37,7 +38,9 @@ export class MailProcessor extends WorkerHost {
       case MailJob.RESET_PASSWORD:
         return this.sendPasswordResetEmail(job.data);
       case MailJob.PASSWORD_CHANGED:
-        return this.mailService.sendPasswordChangedEmail(job.data.email);
+        return this.sendPasswordChangedEmail(
+          job.data as PasswordChangedJobData,
+        );
       default:
         throw new Error(`Không có xử lý cho job ${job.name}`);
     }
@@ -81,5 +84,15 @@ export class MailProcessor extends WorkerHost {
     );
 
     await this.mailService.sendPasswordResetEmail(email, userId, token);
+  }
+
+  private sendPasswordChangedEmail({
+    email,
+    changedAt,
+  }: PasswordChangedJobData): Promise<void> {
+    return this.mailService.sendPasswordChangedEmail(
+      email,
+      new Date(changedAt),
+    );
   }
 }

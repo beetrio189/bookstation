@@ -187,10 +187,6 @@ export class AuthService {
     userId: string,
     { currentPassword, newPassword }: ChangePasswordDto,
   ): Promise<void> {
-    if (newPassword === currentPassword) {
-      throw new AppException(ERRORS.SAME_PASSWORD);
-    }
-
     const provider =
       await this.usersService.findLocalProviderWithPassword(userId);
 
@@ -202,28 +198,25 @@ export class AuthService {
       throw new AppException(ERRORS.WRONG_PASSWORD);
     }
 
-    await this.usersService.updateLocalPassword(
-      userId,
-      await hashPassword(newPassword),
-    );
-    await this.refreshTokenService.revokeAll(userId);
-  }
-
-  async getProfile(userId: string) {
-    const user = await this.usersService.findById(userId);
-
-    if (!user) {
-      throw new AppException(ERRORS.UNAUTHENTICATED);
+    if (newPassword === currentPassword) {
+      throw new AppException(ERRORS.SAME_PASSWORD);
     }
 
-    return {
-      id: user.id,
-      name: user.name,
-      notificationEmail: user.notificationEmail,
-      avatarUrl: user.avatarUrl,
-      bio: user.bio,
-      role: user.role,
-    };
+    const result = await this.usersService.changeLocalPassword(
+      userId,
+      provider.passwordHash,
+      await hashPassword(newPassword),
+    );
+
+    if (result.status === 'password-changed-meanwhile') {
+      throw new AppException(ERRORS.WRONG_PASSWORD);
+    }
+
+    if (result.status === 'locked') {
+      throw new AppException(ERRORS.ACCOUNT_LOCKED);
+    }
+
+    await this.enqueuePasswordChangedEmail(userId, result.email);
   }
 
   private async issueTokens(user: User) {

@@ -12,6 +12,8 @@ import { RoleCode } from '../../src/utils/enums/role-code.enum';
 import { AuthUser } from '../../src/utils/types/auth-user';
 import { JwtPayload } from '../../src/utils/types/jwt-payload';
 import { JwtAuthGuard } from '../../src/guards/jwt-auth.guard';
+import { UsersService } from '../../src/modules/users/users.service';
+import { UserStatus } from '../../src/utils/enums/user-status.enum';
 import { RolesGuard } from '../../src/guards/roles.guard';
 
 const SECRET = 'test-secret-that-is-at-least-32-chars';
@@ -57,6 +59,11 @@ const ADMIN = payloadFor('admin', RoleCode.ADMIN);
 describe('JwtAuthGuard + RolesGuard', () => {
   let app: INestApplication;
   let jwt: JwtService;
+  const usersService = { findStatus: jest.fn() };
+
+  beforeEach(() => {
+    usersService.findStatus.mockResolvedValue(UserStatus.ACTIVE);
+  });
 
   const get = (path: string, token?: string) => {
     const req = request(app.getHttpServer()).get(path);
@@ -70,6 +77,7 @@ describe('JwtAuthGuard + RolesGuard', () => {
       providers: [
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
         { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
+        { provide: UsersService, useValue: usersService },
         { provide: APP_GUARD, useClass: JwtAuthGuard },
         { provide: APP_GUARD, useClass: RolesGuard },
       ],
@@ -103,6 +111,30 @@ describe('JwtAuthGuard + RolesGuard', () => {
     await get('/test/me', token)
       .expect(401)
       .expect({ error: { code: 1001, message: 'Bạn chưa đăng nhập' } });
+  });
+
+  it('rejects a locked account even with a valid token', async () => {
+    usersService.findStatus.mockResolvedValue(UserStatus.LOCKED);
+
+    await get('/test/me', jwt.sign(READER))
+      .expect(403)
+      .expect({
+        error: { code: 2003, message: 'Tài khoản của bạn đã bị khóa' },
+      });
+    expect(usersService.findStatus).toHaveBeenCalledWith('reader');
+  });
+
+  it('rejects a token of a user that no longer exists', async () => {
+    usersService.findStatus.mockResolvedValue(null);
+
+    await get('/test/me', jwt.sign(READER)).expect(401);
+  });
+
+  it('does not query the database for a bad token', async () => {
+    usersService.findStatus.mockClear();
+
+    await get('/test/me', 'garbage').expect(401);
+    expect(usersService.findStatus).not.toHaveBeenCalled();
   });
 
   it('rejects an expired token', async () => {

@@ -1,7 +1,12 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { MAIL_QUEUE, MailJob, MailJobData } from './mail-queue.constants';
+import {
+  MAIL_QUEUE,
+  MailJob,
+  MailJobData,
+  PasswordChangedJobData,
+} from './mail-queue.constants';
 
 @Injectable()
 export class MailQueueService {
@@ -25,6 +30,12 @@ export class MailQueueService {
     userId: string,
     email: string,
   ): Promise<void> {
-    await this.queue.add(MailJob.PASSWORD_CHANGED, { userId, email });
+    const data: PasswordChangedJobData = {
+      userId,
+      email,
+      changedAt: new Date().toISOString(),
+    };
+
+    await this.queue.add(MailJob.PASSWORD_CHANGED, data);
   }
 }
