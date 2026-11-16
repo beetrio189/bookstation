@@ -1,0 +1,85 @@
+# Chạy toàn bộ BookStation bằng một lệnh:  docker compose up --build
+# Web: http://localhost:3000   API: http://localhost:8080/api
+# Port 3000 bị chiếm/bị Windows giữ thì đổi:  WEB_PORT=3100 docker compose up --build
+#   (nhớ sửa FE_URL trong backend/.env theo port mới, không thì CORS chặn)
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bookstation
+      POSTGRES_PASSWORD: bookstation
+      POSTGRES_DB: bookstation
+    # Mở cho pgAdmin trên máy, chỉ localhost vào được
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bookstation -d bookstation']
+      interval: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory-policy noeviction
+    # Mở cho Redis Insight / redis-cli trên máy, chỉ localhost vào được
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      retries: 20
+
+  # API tự chạy migration lúc khởi động (migrationsRun), healthy = đã migrate xong
+  api:
+    image: bookstation-backend
+    build: ./backend
+    env_file: ./backend/.env
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/api/health']
+      interval: 3s
+      retries: 40
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Chạy một lần sau khi API lên: tạo admin theo ADMIN_EMAIL/ADMIN_PASSWORD trong .env
+  seed:
+    image: bookstation-backend
+    env_file: ./backend/.env
+    command: ['node', 'dist/database/seeds/seed-admin.js']
+    depends_on:
+      api:
+        condition: service_healthy
+
+  worker:
+    image: bookstation-backend
+    env_file: ./backend/.env
+    restart: unless-stopped
+    command: ['node', 'dist/worker']
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    image: bookstation-web
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  redis-data:

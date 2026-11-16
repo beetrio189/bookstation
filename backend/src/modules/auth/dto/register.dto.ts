@@ -1,13 +1,13 @@
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { IsNormalizedEmail } from '../../../decorators/is-normalized-email.decorator';
-import { IsPassword } from '../../../decorators/is-password.decorator';
+import { IsNewPassword } from '../../../decorators/is-password.decorator';
 
 export class RegisterDto {
   @IsNormalizedEmail()
   email: string;
 
-  @IsPassword()
+  @IsNewPassword()
   password: string;
 
   @Transform(({ value }: { value: unknown }) =>

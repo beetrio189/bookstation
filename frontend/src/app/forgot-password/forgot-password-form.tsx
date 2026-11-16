@@ -1,13 +1,39 @@
 "use client";
 
-import type { FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
+import { FormMessage } from "@/components/form-message";
 import { OutlinedInput } from "@/components/outlined-input";
 import { Button } from "@/components/ui/button";
+import { api, ApiError, isSystemError } from "@/lib/api";
 
 export function ForgotPasswordForm() {
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // TODO: gọi POST /auth/forgot-password { email } khi có lớp gọi API
+    const formElement = event.currentTarget;
+    const email = String(new FormData(formElement).get("email"));
+
+    setIsPending(true);
+    setError(null);
+
+    try {
+      // Luôn trả {} dù email có tài khoản hay không (chống dò email)
+      await api("/auth/forgot-password", { method: "POST", body: { email } });
+      // Next giữ nguyên trang khi chuyển đi, xóa form để quay lại thấy form trống
+      formElement.reset();
+      router.push("/forgot-password/sent");
+    } catch (caught) {
+      // Lỗi hệ thống đã có toast, chỉ hiện dòng chữ cho lỗi nghiệp vụ
+      if (caught instanceof ApiError && !isSystemError(caught.status)) {
+        setError(caught.message);
+      }
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -31,7 +57,13 @@ export function ForgotPasswordForm() {
         required
       />
 
-      <Button type="submit" className="h-12.5 rounded-lg text-xl font-bold">
+      {error && <FormMessage tone="error">{error}</FormMessage>}
+
+      <Button
+        type="submit"
+        disabled={isPending}
+        className="h-12.5 rounded-lg text-xl font-bold"
+      >
         Gửi email
       </Button>
     </form>

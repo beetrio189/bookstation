@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Quicksand } from "next/font/google";
+import { SessionRestorer } from "@/components/session-restorer";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -30,7 +31,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         {children}
-        <Toaster />
+        <SessionRestorer />
+        {/* Toast lỗi hệ thống theo component "Toast lỗi" trên Figma */}
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

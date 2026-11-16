@@ -1,23 +1,53 @@
 "use client";
 
-import type { FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
+import { FormMessage } from "@/components/form-message";
 import { OutlinedInput } from "@/components/outlined-input";
 import { PasswordInput } from "@/components/password-input";
 import { Button } from "@/components/ui/button";
 import { usePasswordConfirm } from "@/hooks/use-password-confirm";
+import { api, ApiError, isSystemError } from "@/lib/api";
+import { NEW_PASSWORD_INPUT_PROPS } from "@/lib/password";
 
 // Khớp với RegisterDto của backend
 const NAME_MAX_LENGTH = 100;
-const PASSWORD_MIN_LENGTH = 8;
-const PASSWORD_MAX_LENGTH = 72;
-const PASSWORD_PATTERN = "[!-~]+";
 
 export function RegisterForm() {
   const { passwordRef, confirmRef, check } = usePasswordConfirm();
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // TODO: gọi POST /auth/register { name, email, password } khi có lớp gọi API
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+
+    setIsPending(true);
+    setError(null);
+
+    try {
+      // Thành công chỉ trả {}, mail xác thực đi qua queue
+      await api("/auth/register", {
+        method: "POST",
+        body: {
+          name: String(form.get("name")),
+          email: String(form.get("email")),
+          password: String(form.get("password")),
+        },
+      });
+      // Next giữ nguyên /register khi chuyển trang, xóa form để quay lại thấy form trống
+      formElement.reset();
+      router.push("/register/sent");
+    } catch (caught) {
+      // Lỗi hệ thống đã có toast, chỉ hiện dòng chữ cho lỗi nghiệp vụ
+      if (caught instanceof ApiError && !isSystemError(caught.status)) {
+        setError(caught.message);
+      }
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -54,10 +84,7 @@ export function RegisterForm() {
         name="password"
         label="Mật khẩu"
         autoComplete="new-password"
-        minLength={PASSWORD_MIN_LENGTH}
-        maxLength={PASSWORD_MAX_LENGTH}
-        pattern={PASSWORD_PATTERN}
-        title="8–72 ký tự, chỉ gồm chữ cái không dấu, chữ số và ký tự đặc biệt"
+        {...NEW_PASSWORD_INPUT_PROPS}
         onChange={check}
         required
       />
@@ -70,7 +97,13 @@ export function RegisterForm() {
         required
       />
 
-      <Button type="submit" className="h-12.5 rounded-lg text-xl font-bold">
+      {error && <FormMessage tone="error">{error}</FormMessage>}
+
+      <Button
+        type="submit"
+        disabled={isPending}
+        className="h-12.5 rounded-lg text-xl font-bold"
+      >
         Đăng ký
       </Button>
     </form>

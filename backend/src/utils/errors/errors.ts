@@ -6,7 +6,17 @@ export interface ErrorDefinition {
   message: string;
 }
 
-// 1xxx: lỗi chung, 2xxx: tài khoản. Module mới dùng dải tiếp theo.
+/**
+ * 1xxx: lỗi chung, 2xxx: tài khoản. Module mới dùng dải tiếp theo.
+ *
+ * Quy ước với FE: phân loại lỗi theo `status`, không theo dải `code`.
+ * - 429, 5xx (và khi không có response): lỗi hệ thống. FE hiện toast góc
+ *   phải với `message`, màn không tự xử lý (frontend/src/lib/api.ts).
+ * - 4xx còn lại: lỗi nghiệp vụ. Màn tự hiện lỗi theo `code` (dưới form,
+ *   đổi trạng thái màn...).
+ * Vì vậy khi thêm lỗi mới: lỗi do người dùng/dữ liệu gửi lên thì dùng 4xx
+ * (trừ 429), đừng dùng 5xx; 429 chỉ dành cho rate limit.
+ */
 export const ERRORS = {
   VALIDATION_ERROR: {
     code: 1000,
@@ -77,8 +87,7 @@ export const ERRORS = {
   PASSWORD_NOT_SET: {
     code: 2006,
     status: HttpStatus.BAD_REQUEST,
-    message:
-      'Tài khoản này chưa có mật khẩu.'
+    message: 'Tài khoản này chưa có mật khẩu.',
   },
   GOOGLE_AUTH_FAILED: {
     code: 2007,
@@ -89,5 +98,17 @@ export const ERRORS = {
     code: 2008,
     status: HttpStatus.BAD_REQUEST,
     message: 'Mật khẩu mới phải khác với mật khẩu đã sử dụng trước đó',
+  },
+  PASSWORD_PWNED: {
+    code: 2009,
+    status: HttpStatus.BAD_REQUEST,
+    message:
+      'Mật khẩu này đã xuất hiện trong các vụ rò rỉ dữ liệu (theo HaveIBeenPwned), vui lòng chọn mật khẩu khác',
+  },
+  EMAIL_ALREADY_VERIFIED: {
+    code: 2010,
+    status: HttpStatus.CONFLICT,
+    message:
+      'Email này đã được xác minh. Nếu quên mật khẩu, hãy chuyển qua Quên mật khẩu',
   },
 } as const satisfies Record<string, ErrorDefinition>;

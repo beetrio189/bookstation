@@ -24,6 +24,7 @@ import { UsersModule } from './users/users.module';
     TypeOrmModule.forRoot({
       ...dataSource.options,
       autoLoadEntities: true,
+      migrationsRun: true,
     }),
     JwtModule.register({
       global: true,

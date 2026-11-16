@@ -10,7 +10,10 @@ import {
   OneTimeTokenPurpose,
   OneTimeTokenService,
 } from '../../../src/modules/auth/one-time-token.service';
+import { PwnedPasswordService } from '../../../src/modules/auth/pwned-password.service';
 import { RefreshTokenService } from '../../../src/modules/auth/refresh-token.service';
+import { AppException } from '../../../src/utils/errors/app.exception';
+import { ERRORS } from '../../../src/utils/errors/errors';
 
 const EMAIL = 'a@example.com';
 const USER = {
@@ -63,6 +66,8 @@ describe('AuthService', () => {
     enqueuePasswordResetEmail: jest.fn(),
     enqueuePasswordChangedEmail: jest.fn(),
   };
+  const pwnedPasswordService = { assertNotPwned: jest.fn() };
+  const PWNED = new AppException(ERRORS.PASSWORD_PWNED, 'lộ 11 lần');
   const service = new AuthService(
     usersService as unknown as UsersService,
     oneTimeTokenService as unknown as OneTimeTokenService,
@@ -70,6 +75,7 @@ describe('AuthService', () => {
     jwtService as unknown as JwtService,
     googleOAuthService as unknown as GoogleOAuthService,
     mailQueueService as unknown as MailQueueService,
+    pwnedPasswordService as unknown as PwnedPasswordService,
   );
   const flushPromises = () => new Promise(setImmediate);
 
@@ -115,6 +121,17 @@ describe('AuthService', () => {
         expect(usersService.createReader).not.toHaveBeenCalled();
       },
     );
+
+    it('rejects a pwned password without creating the user', async () => {
+      pwnedPasswordService.assertNotPwned.mockRejectedValue(PWNED);
+
+      await expect(service.register(REGISTER)).rejects.toBe(PWNED);
+      expect(pwnedPasswordService.assertNotPwned).toHaveBeenCalledWith(
+        REGISTER.password,
+      );
+      expect(usersService.createReader).not.toHaveBeenCalled();
+      expect(mailQueueService.enqueueVerificationEmail).not.toHaveBeenCalled();
+    });
 
     it('rejects when a concurrent request takes the email first', async () => {
       usersService.createReader.mockRejectedValue(
@@ -224,27 +241,36 @@ describe('AuthService', () => {
       expect(mailQueueService.enqueueVerificationEmail).not.toHaveBeenCalled();
     });
 
-    it('does nothing for a verified login', async () => {
+    it('rejects a verified login without sending an email', async () => {
       usersService.findLocalProvider.mockResolvedValue(PROVIDER);
 
-      await service.resendVerification(EMAIL);
-      await flushPromises();
-
-      expect(mailQueueService.enqueueVerificationEmail).not.toHaveBeenCalled();
-    });
-
-    it('does nothing for a locked account, without an error', async () => {
-      usersService.findLocalProvider.mockResolvedValue({
-        ...PROVIDER,
-        verified: false,
-        user: LOCKED_USER,
+      await expect(service.resendVerification(EMAIL)).rejects.toMatchObject({
+        code: 2010,
       });
-
-      await expect(service.resendVerification(EMAIL)).resolves.toBeUndefined();
       await flushPromises();
 
       expect(mailQueueService.enqueueVerificationEmail).not.toHaveBeenCalled();
     });
+
+    it.each([true, false])(
+      'rejects a locked account without sending an email (verified: %s)',
+      async (verified) => {
+        usersService.findLocalProvider.mockResolvedValue({
+          ...PROVIDER,
+          verified,
+          user: LOCKED_USER,
+        });
+
+        await expect(service.resendVerification(EMAIL)).rejects.toMatchObject({
+          code: 2003,
+        });
+        await flushPromises();
+
+        expect(
+          mailQueueService.enqueueVerificationEmail,
+        ).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('sessions', () => {
@@ -566,13 +592,15 @@ describe('AuthService', () => {
         );
       });
 
-      it('does nothing for a locked account, without an error', async () => {
+      it('rejects a locked account without sending an email', async () => {
         usersService.findLocalProvider.mockResolvedValue({
           ...PROVIDER,
           user: LOCKED_USER,
         });
 
-        await expect(service.forgotPassword(EMAIL)).resolves.toBeUndefined();
+        await expect(service.forgotPassword(EMAIL)).rejects.toMatchObject({
+          code: 2003,
+        });
         await flushPromises();
 
         expect(
@@ -601,6 +629,16 @@ describe('AuthService', () => {
           status: 'reset',
           email: EMAIL,
         });
+      });
+
+      it('rejects a pwned password before consuming the token', async () => {
+        pwnedPasswordService.assertNotPwned.mockRejectedValue(PWNED);
+
+        await expect(service.resetPassword(RESET)).rejects.toBe(PWNED);
+        expect(pwnedPasswordService.assertNotPwned).toHaveBeenCalledWith(NEW);
+        // Link vẫn dùng lại được với mật khẩu khác
+        expect(oneTimeTokenService.consume).not.toHaveBeenCalled();
+        expect(usersService.resetLocalPassword).not.toHaveBeenCalled();
       });
 
       it('consumes the token, sets the password and emails the user', async () => {
@@ -713,6 +751,17 @@ describe('AuthService', () => {
           }),
         ).rejects.toMatchObject({ code: 2005 });
         expect(usersService.changeLocalPassword).not.toHaveBeenCalled();
+        expect(pwnedPasswordService.assertNotPwned).not.toHaveBeenCalled();
+      });
+
+      it('rejects a pwned new password after checking the current one', async () => {
+        pwnedPasswordService.assertNotPwned.mockRejectedValue(PWNED);
+
+        await expect(service.changePassword(USER.id, CHANGE)).rejects.toBe(
+          PWNED,
+        );
+        expect(pwnedPasswordService.assertNotPwned).toHaveBeenCalledWith(NEW);
+        expect(usersService.changeLocalPassword).not.toHaveBeenCalled();
       });
 
       it('rejects a new password equal to the current one', async () => {
@@ -723,6 +772,7 @@ describe('AuthService', () => {
           }),
         ).rejects.toMatchObject({ code: 2008 });
         expect(usersService.changeLocalPassword).not.toHaveBeenCalled();
+        expect(pwnedPasswordService.assertNotPwned).not.toHaveBeenCalled();
       });
 
       it.each([

@@ -23,6 +23,7 @@ import {
   OneTimeTokenPurpose,
   OneTimeTokenService,
 } from './one-time-token.service';
+import { PwnedPasswordService } from './pwned-password.service';
 import { RefreshTokenService } from './refresh-token.service';
 
 const POSTGRES_UNIQUE_VIOLATION = '23505';
@@ -45,12 +46,15 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly googleOAuthService: GoogleOAuthService,
     private readonly mailQueueService: MailQueueService,
+    private readonly pwnedPasswordService: PwnedPasswordService,
   ) {}
 
   async register({ email, password, name }: RegisterDto): Promise<void> {
     if (await this.usersService.findLocalProvider(email)) {
       throw new AppException(ERRORS.EMAIL_ALREADY_EXISTS);
     }
+
+    await this.pwnedPasswordService.assertNotPwned(password);
 
     const user = await this.createReader(
       email,
@@ -82,9 +86,19 @@ export class AuthService {
   async resendVerification(email: string): Promise<void> {
     const provider = await this.usersService.findLocalProvider(email);
 
-    if (provider && !provider.verified && !isLocked(provider.user)) {
-      void this.enqueueVerificationEmail(provider.userId, email);
+    if (!provider) {
+      return;
     }
+
+    if (isLocked(provider.user)) {
+      throw new AppException(ERRORS.ACCOUNT_LOCKED);
+    }
+
+    if (provider.verified) {
+      throw new AppException(ERRORS.EMAIL_ALREADY_VERIFIED);
+    }
+
+    void this.enqueueVerificationEmail(provider.userId, email);
   }
 
   async login({ email, password }: LoginDto) {
@@ -145,9 +159,15 @@ export class AuthService {
   async forgotPassword(email: string): Promise<void> {
     const provider = await this.usersService.findLocalProvider(email);
 
-    if (provider && !isLocked(provider.user)) {
-      void this.enqueuePasswordResetEmail(provider.userId, email);
+    if (!provider) {
+      return;
     }
+
+    if (isLocked(provider.user)) {
+      throw new AppException(ERRORS.ACCOUNT_LOCKED);
+    }
+
+    void this.enqueuePasswordResetEmail(provider.userId, email);
   }
 
   async resetPassword({
@@ -155,6 +175,8 @@ export class AuthService {
     token,
     newPassword,
   }: ResetPasswordDto): Promise<void> {
+    await this.pwnedPasswordService.assertNotPwned(newPassword);
+
     // Lua GET + DEL nguyên tử: hai request cùng lúc với một token thì chỉ một request đi tiếp
     const isConsumed = await this.oneTimeTokenService.consume(
       OneTimeTokenPurpose.RESET_PASSWORD,
@@ -201,6 +223,8 @@ export class AuthService {
     if (newPassword === currentPassword) {
       throw new AppException(ERRORS.SAME_PASSWORD);
     }
+
+    await this.pwnedPasswordService.assertNotPwned(newPassword);
 
     const result = await this.usersService.changeLocalPassword(
       userId,

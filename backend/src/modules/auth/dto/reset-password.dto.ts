@@ -1,5 +1,5 @@
 import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
-import { IsPassword } from '../../../decorators/is-password.decorator';
+import { IsNewPassword } from '../../../decorators/is-password.decorator';
 
 export class ResetPasswordDto {
   @IsUUID('all', { message: 'Mã người dùng không hợp lệ' })
@@ -9,6 +9,6 @@ export class ResetPasswordDto {
   @IsNotEmpty({ message: 'Thiếu mã đặt lại mật khẩu' })
   token: string;
 
-  @IsPassword()
+  @IsNewPassword()
   newPassword: string;
 }

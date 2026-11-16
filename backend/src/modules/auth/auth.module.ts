@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { GoogleOAuthService } from './google-oauth.service';
 import { OneTimeTokenService } from './one-time-token.service';
+import { PwnedPasswordService } from './pwned-password.service';
 import { RefreshTokenService } from './refresh-token.service';
 
 @Module({
@@ -20,6 +21,7 @@ import { RefreshTokenService } from './refresh-token.service';
     AuthService,
     GoogleOAuthService,
     OneTimeTokenService,
+    PwnedPasswordService,
     RefreshTokenService,
   ],
 })

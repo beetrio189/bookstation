@@ -13,10 +13,12 @@ const pipe = new ValidationPipe({
 });
 const VALID = {
   email: 'a@example.com',
-  password: 'MatKhau123',
+  password: 'MatKhau@123',
   name: 'Wing',
 };
 const UID = '019a6e1c-3f2b-7a4c-8d1e-2b3c4d5e6f70';
+const WEAK_PASSWORD_MESSAGE =
+  'Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số và 1 ký tự đặc biệt (ví dụ: ! @ # $ % & * ?)';
 const validate = (metatype: new () => object, value: object) =>
   pipe.transform(value, { type: 'body', metatype });
 
@@ -36,8 +38,8 @@ describe('auth DTOs', () => {
   });
 
   it.each([
-    'a'.repeat(8),
-    'a'.repeat(72),
+    'aA1!aaaa',
+    `aA1!${'a'.repeat(68)}`,
     'Mat-khau@1',
     `aA0!"#$%&'()*+,-./:;<=>?@[\\]^_\`{|}~`,
   ])('accepts the password %s', async (password) => {
@@ -76,6 +78,26 @@ describe('auth DTOs', () => {
       'Mật khẩu chỉ được gồm chữ cái không dấu, chữ số và ký tự đặc biệt',
     ],
     [
+      'a password without uppercase',
+      { password: 'matkhau@1' },
+      WEAK_PASSWORD_MESSAGE,
+    ],
+    [
+      'a password without lowercase',
+      { password: 'MATKHAU@1' },
+      WEAK_PASSWORD_MESSAGE,
+    ],
+    [
+      'a password without a digit',
+      { password: 'MatKhau@!' },
+      WEAK_PASSWORD_MESSAGE,
+    ],
+    [
+      'a password without a special character',
+      { password: 'MatKhau12' },
+      WEAK_PASSWORD_MESSAGE,
+    ],
+    [
       'a blank display name',
       { name: '   ' },
       'Tên hiển thị không được để trống',
@@ -100,6 +122,12 @@ describe('auth DTOs', () => {
     await expect(
       validate(LoginDto, { email: ' A@Example.COM ', password: 'Mat-khau@1' }),
     ).resolves.toEqual({ email: 'a@example.com', password: 'Mat-khau@1' });
+  });
+
+  it('accepts a login with an old weak password', async () => {
+    await expect(
+      validate(LoginDto, { email: VALID.email, password: 'abcdefgh' }),
+    ).resolves.toBeInstanceOf(LoginDto);
   });
 
   it.each([
@@ -135,12 +163,13 @@ describe('auth DTOs', () => {
       { newPassword: 'a'.repeat(73) },
       'Mật khẩu chỉ được tối đa 72 ký tự',
     ],
+    ['a weak password', { newPassword: 'matkhaumoi1' }, WEAK_PASSWORD_MESSAGE],
   ])('rejects a password reset with %s', async (_case, override, message) => {
     await expect(
       validate(ResetPasswordDto, {
         uid: UID,
         token: 'token-1',
-        newPassword: 'MatKhauMoi1',
+        newPassword: 'MatKhauMoi@1',
         ...override,
       }),
     ).rejects.toMatchObject({ code: 1000, message });
@@ -162,14 +191,28 @@ describe('auth DTOs', () => {
       { newPassword: 'ngan' },
       'Mật khẩu phải có ít nhất 8 ký tự',
     ],
+    [
+      'a weak new password',
+      { newPassword: 'matkhaumoi1' },
+      WEAK_PASSWORD_MESSAGE,
+    ],
   ])('rejects a password change with %s', async (_case, override, message) => {
     await expect(
       validate(ChangePasswordDto, {
         currentPassword: 'mat-khau-cu',
-        newPassword: 'MatKhauMoi1',
+        newPassword: 'MatKhauMoi@1',
         ...override,
       }),
     ).rejects.toMatchObject({ code: 1000, message });
+  });
+
+  it('accepts a password change with an old weak current password', async () => {
+    await expect(
+      validate(ChangePasswordDto, {
+        currentPassword: 'abcdefgh',
+        newPassword: 'MatKhauMoi@1',
+      }),
+    ).resolves.toBeInstanceOf(ChangePasswordDto);
   });
 
   it('accepts a verify-email link with a uuidv7 uid', async () => {

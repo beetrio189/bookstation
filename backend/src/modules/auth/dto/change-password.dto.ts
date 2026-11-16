@@ -1,9 +1,12 @@
-import { IsPassword } from '../../../decorators/is-password.decorator';
+import {
+  IsNewPassword,
+  IsPassword,
+} from '../../../decorators/is-password.decorator';
 
 export class ChangePasswordDto {
   @IsPassword()
   currentPassword: string;
 
-  @IsPassword()
+  @IsNewPassword()
   newPassword: string;
 }

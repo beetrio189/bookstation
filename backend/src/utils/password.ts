@@ -5,6 +5,9 @@ export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 72;
 // Chữ cái không dấu, chữ số và 32 ký tự đặc biệt !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~,
 export const PASSWORD_PATTERN = /^[\x21-\x7E]+$/;
+// Mật khẩu mới: đủ chữ thường, chữ hoa, chữ số và ký tự đặc biệt (dùng cùng PASSWORD_PATTERN)
+export const PASSWORD_STRENGTH_PATTERN =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d])/;
 
 export const DUMMY_PASSWORD_HASH =
   '$2b$12$giA.HBgG8aulZ8TdFg3hRu/.vYwEi6fZQehRtgnclb2VZvKbwruKO';

@@ -10,4 +10,5 @@ Object.assign(process.env, {
   GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'test-client-secret',
   GOOGLE_REDIRECT_URI: 'http://localhost:8080/api/auth/google/callback',
+  PWNED_PASSWORD_THRESHOLD: '10',
 });
