@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { QueryFailedError } from 'typeorm';
+import { isUniqueViolation } from '../../utils/database-errors';
 import { UserStatus } from '../../utils/enums/user-status.enum';
 import { AppException } from '../../utils/errors/app.exception';
 import { ERRORS } from '../../utils/errors/errors';
@@ -26,14 +26,9 @@ import {
 import { PwnedPasswordService } from './pwned-password.service';
 import { RefreshTokenService } from './refresh-token.service';
 
-const POSTGRES_UNIQUE_VIOLATION = '23505';
 const MAX_NAME_LENGTH = 100;
 
 const isLocked = (user: User): boolean => user.status === UserStatus.LOCKED;
-
-const isUniqueViolation = (error: unknown): boolean =>
-  error instanceof QueryFailedError &&
-  (error.driverError as { code?: string }).code === POSTGRES_UNIQUE_VIOLATION;
 
 @Injectable()
 export class AuthService {

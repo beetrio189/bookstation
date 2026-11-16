@@ -1,0 +1,20 @@
+// Khớp enum "system_action_type" trong DB (migration AccountActionTypes, ModeratorPasswordReset)
+export enum SystemActionType {
+  MODERATOR_CREATION = 'moderator_creation',
+  MODERATOR_DELETION = 'moderator_deletion',
+  MODERATOR_PASSWORD_RESET = 'moderator_password_reset',
+  PUBLISHER_CREATION = 'publisher_creation',
+  PUBLISHER_UPDATE = 'publisher_update',
+  PUBLISHER_DELETION = 'publisher_deletion',
+  PUBLISHER_SUSPENDED = 'publisher_suspended',
+  EDITOR_CREATION = 'editor_creation',
+  EDITOR_UPDATE = 'editor_update',
+  EDITOR_DELETION = 'editor_deletion',
+  READER_LOCK = 'reader_lock',
+  READER_UNLOCK = 'reader_unlock',
+  BOOK_CREATION = 'book_creation',
+  BOOK_UPDATE = 'book_update',
+  BOOK_DELETION = 'book_deletion',
+  BOOK_REVIEW = 'book_review',
+  REVIEW_DELETION = 'review_deletion',
+}

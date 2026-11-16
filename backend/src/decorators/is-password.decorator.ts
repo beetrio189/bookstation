@@ -13,9 +13,8 @@ import {
   PASSWORD_STRENGTH_PATTERN,
 } from '../utils/password';
 
-// Mật khẩu đã có (login, currentPassword): chỉ kiểm tra định dạng, không áp luật
-// mật khẩu mạnh để tài khoản đặt mật khẩu trước khi có luật vẫn đăng nhập được
-export const IsPassword = () =>
+// Định dạng chung: độ dài và ký tự cho phép
+const IsPasswordFormat = () =>
   applyDecorators(
     IsString({ message: 'Mật khẩu không hợp lệ' }),
     MinLength(PASSWORD_MIN_LENGTH, {
@@ -30,12 +29,12 @@ export const IsPassword = () =>
     }),
   );
 
-// Mật khẩu mới (register, reset-password, newPassword): định dạng + đủ 4 loại ký tự.
-// Dùng ValidateBy tên riêng, không dùng Matches lần nữa: hai Matches trùng key
+// Mọi ô mật khẩu (register, login, reset-password, change-password): định dạng
+// + đủ 4 loại ký tự. Dùng ValidateBy tên riêng, không dùng Matches lần nữa: hai Matches trùng key
 // "matches" thì câu sau đè câu trước, mất câu báo ký tự không hợp lệ
 export const IsNewPassword = () =>
   applyDecorators(
-    IsPassword(),
+    IsPasswordFormat(),
     ValidateBy({
       name: 'isStrongPassword',
       validator: {

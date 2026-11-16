@@ -280,6 +280,37 @@ export class UsersService {
     );
   }
 
+  /**
+   * Ghi mật khẩu do hệ thống sinh vào đăng nhập local (tài khoản KDV/NXB vừa tạo).
+   * Trả false nếu user hoặc đăng nhập local không còn (đã bị xóa trước khi gửi mail).
+   */
+  async setLocalPasswordHash(
+    userId: string,
+    passwordHash: string,
+  ): Promise<boolean> {
+    const { affected } = await this.providersRepository.update(
+      { userId, provider: IdentityProvider.LOCAL },
+      { passwordHash },
+    );
+
+    return (affected ?? 0) > 0;
+  }
+
+  /**
+   * Xóa mật khẩu do hệ thống sinh khi mail chứa nó gửi thất bại hẳn, để
+   * hasPassword = false. Chỉ xóa nếu DB vẫn giữ đúng hash đó: job khác đã đặt
+   * mật khẩu mới (và gửi được) thì giữ nguyên.
+   */
+  async clearLocalPasswordHash(
+    userId: string,
+    passwordHash: string,
+  ): Promise<void> {
+    await this.providersRepository.update(
+      { userId, provider: IdentityProvider.LOCAL, passwordHash },
+      { passwordHash: null },
+    );
+  }
+
   async deleteUnverifiedLocalUsers(createdBefore: Date): Promise<number> {
     const [rows] = (await this.usersRepository.query(
       `

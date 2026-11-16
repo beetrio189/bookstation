@@ -99,6 +99,74 @@ describe('MailService', () => {
     );
   });
 
+  it.each([
+    ['publisher', 'nhà xuất bản'],
+    ['moderator', 'kiểm duyệt viên'],
+  ] as const)(
+    'emails the login and password of a new %s account',
+    async (accountType, label) => {
+      env.resendApiKey = 're_test';
+      send.mockResolvedValue({ data: { id: '1' }, error: null });
+
+      await new MailService().sendAccountCredentialsEmail(
+        'nxb@example.com',
+        accountType,
+        'Ab3$xyz-Pq9!kLm2',
+      );
+
+      const [{ to, html }] = send.mock.calls[0] as [
+        { to: string; html: string },
+      ];
+
+      expect(to).toBe('nxb@example.com');
+      expect(html).toContain(`Tài khoản ${label} BookStation`);
+      expect(html).toContain('Email đăng nhập: <b>nxb@example.com</b>');
+      expect(html).toContain('Mật khẩu: <b>Ab3$xyz-Pq9!kLm2</b>');
+      expect(html).toContain('href="http://localhost:3000/login"');
+      expect(html).toContain('đổi mật khẩu ngay');
+    },
+  );
+
+  it('emails the new password after an admin reset, with reset wording', async () => {
+    env.resendApiKey = 're_test';
+    send.mockResolvedValue({ data: { id: '1' }, error: null });
+
+    await new MailService().sendAccountPasswordResetEmail(
+      'kdv@example.com',
+      'moderator',
+      'Ab3$xyz-Pq9!kLm2',
+    );
+
+    const [{ to, subject, html }] = send.mock.calls[0] as [
+      { to: string; subject: string; html: string },
+    ];
+
+    expect(to).toBe('kdv@example.com');
+    expect(subject).toBe('Mật khẩu BookStation của bạn đã được đặt lại');
+    expect(html).toContain(
+      'Mật khẩu tài khoản kiểm duyệt viên BookStation của bạn đã được đặt lại',
+    );
+    expect(html).not.toContain('đã được tạo');
+    expect(html).toContain('Email đăng nhập: <b>kdv@example.com</b>');
+    expect(html).toContain('Mật khẩu: <b>Ab3$xyz-Pq9!kLm2</b>');
+    expect(html).toContain('href="http://localhost:3000/login"');
+  });
+
+  it('escapes HTML in the credentials email', async () => {
+    env.resendApiKey = 're_test';
+    send.mockResolvedValue({ data: { id: '1' }, error: null });
+
+    await new MailService().sendAccountCredentialsEmail(
+      'a@example.com',
+      'publisher',
+      '<b>&"',
+    );
+
+    const [{ html }] = send.mock.calls[0] as [{ html: string }];
+
+    expect(html).toContain('Mật khẩu: <b>&lt;b&gt;&amp;&quot;</b>');
+  });
+
   it('throws when Resend reports an error', async () => {
     env.resendApiKey = 're_test';
     send.mockResolvedValue({ data: null, error: { message: 'bad domain' } });

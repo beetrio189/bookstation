@@ -2,6 +2,8 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import {
+  AccountCredentialsJobData,
+  AccountType,
   MAIL_QUEUE,
   MailJob,
   MailJobData,
@@ -37,5 +39,25 @@ export class MailQueueService {
     };
 
     await this.queue.add(MailJob.PASSWORD_CHANGED, data);
+  }
+
+  async enqueueAccountCredentialsEmail(
+    userId: string,
+    email: string,
+    accountType: AccountType,
+  ): Promise<void> {
+    const data: AccountCredentialsJobData = { userId, email, accountType };
+
+    await this.queue.add(MailJob.ACCOUNT_CREDENTIALS, data);
+  }
+
+  async enqueueAccountPasswordResetEmail(
+    userId: string,
+    email: string,
+    accountType: AccountType,
+  ): Promise<void> {
+    const data: AccountCredentialsJobData = { userId, email, accountType };
+
+    await this.queue.add(MailJob.ACCOUNT_PASSWORD_RESET, data);
   }
 }

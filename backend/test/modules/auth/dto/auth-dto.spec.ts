@@ -124,10 +124,10 @@ describe('auth DTOs', () => {
     ).resolves.toEqual({ email: 'a@example.com', password: 'Mat-khau@1' });
   });
 
-  it('accepts a login with an old weak password', async () => {
+  it('rejects a login with a weak password', async () => {
     await expect(
       validate(LoginDto, { email: VALID.email, password: 'abcdefgh' }),
-    ).resolves.toBeInstanceOf(LoginDto);
+    ).rejects.toMatchObject({ code: 1000, message: WEAK_PASSWORD_MESSAGE });
   });
 
   it.each([
@@ -199,20 +199,20 @@ describe('auth DTOs', () => {
   ])('rejects a password change with %s', async (_case, override, message) => {
     await expect(
       validate(ChangePasswordDto, {
-        currentPassword: 'mat-khau-cu',
+        currentPassword: 'MatKhauCu@1',
         newPassword: 'MatKhauMoi@1',
         ...override,
       }),
     ).rejects.toMatchObject({ code: 1000, message });
   });
 
-  it('accepts a password change with an old weak current password', async () => {
+  it('rejects a password change with a weak current password', async () => {
     await expect(
       validate(ChangePasswordDto, {
         currentPassword: 'abcdefgh',
         newPassword: 'MatKhauMoi@1',
       }),
-    ).resolves.toBeInstanceOf(ChangePasswordDto);
+    ).rejects.toMatchObject({ code: 1000, message: WEAK_PASSWORD_MESSAGE });
   });
 
   it('accepts a verify-email link with a uuidv7 uid', async () => {

@@ -1,10 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 import { env } from '../../config';
+import { AccountType } from './mail-queue.constants';
 
 // Link trong email mang cả uid lẫn token: Redis lưu token theo uid
 const buildLink = (path: string, userId: string, token: string) =>
   `${env.feUrl}/${path}?${new URLSearchParams({ uid: userId, token }).toString()}`;
+
+const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  publisher: 'nhà xuất bản',
+  moderator: 'kiểm duyệt viên',
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 
 interface MailMessage {
   to: string;
@@ -73,9 +86,72 @@ export class MailService {
       html: `
         <p>Chào bạn,</p>
         <p>Mật khẩu tài khoản BookStation của bạn vừa được thay đổi lúc ${time} (giờ Việt Nam). Mọi thiết bị đã bị đăng xuất.</p>
-        <p>Nếu không phải bạn, hãy dùng chức năng <a href="${forgotPasswordLink}">Quên mật khẩu</a> ngay và liên hệ admin_bookstation@gmail.com.</p>
+        <p>Nếu không phải bạn, hãy dùng chức năng <a href="${forgotPasswordLink}">Quên mật khẩu</a> ngay và liên hệ bookstationadmin@gmail.com.</p>
       `,
       devNote: `mật khẩu vừa được thay đổi lúc ${time}`,
+    });
+  }
+
+  /**
+   * Tài khoản do hệ thống cấp (NXB do kiểm duyệt viên/admin tạo, kiểm duyệt viên do
+   * admin tạo): gửi email đăng nhập + mật khẩu, nhắc đổi mật khẩu ngay (chỉ nhắc).
+   */
+  sendAccountCredentialsEmail(
+    to: string,
+    accountType: AccountType,
+    password: string,
+  ): Promise<void> {
+    const label = ACCOUNT_TYPE_LABELS[accountType];
+
+    return this.sendCredentials(to, accountType, password, {
+      subject: 'Tài khoản BookStation của bạn đã được tạo',
+      intro: `Tài khoản ${label} BookStation của bạn đã được tạo.`,
+      afterLogin: 'đăng nhập lần đầu',
+      notRequested: 'Nếu bạn không yêu cầu tạo tài khoản',
+    });
+  }
+
+  sendAccountPasswordResetEmail(
+    to: string,
+    accountType: AccountType,
+    password: string,
+  ): Promise<void> {
+    const label = ACCOUNT_TYPE_LABELS[accountType];
+
+    return this.sendCredentials(to, accountType, password, {
+      subject: 'Mật khẩu BookStation của bạn đã được đặt lại',
+      intro: `Mật khẩu tài khoản ${label} BookStation của bạn đã được đặt lại. Mật khẩu cũ không còn dùng được.`,
+      afterLogin: 'đăng nhập',
+      notRequested: 'Nếu bạn không yêu cầu đặt lại mật khẩu',
+    });
+  }
+
+  private async sendCredentials(
+    to: string,
+    accountType: AccountType,
+    password: string,
+    text: {
+      subject: string;
+      intro: string;
+      afterLogin: string;
+      notRequested: string;
+    },
+  ): Promise<void> {
+    const loginLink = `${env.feUrl}/login`;
+
+    await this.send({
+      to,
+      subject: text.subject,
+      html: `
+        <p>Chào bạn,</p>
+        <p>${text.intro}</p>
+        <p>Email đăng nhập: <b>${escapeHtml(to)}</b><br>Mật khẩu: <b>${escapeHtml(password)}</b></p>
+        <p><a href="${loginLink}">Đăng nhập BookStation</a></p>
+        <p><b>Vì lý do bảo mật, hãy đổi mật khẩu ngay sau khi ${text.afterLogin}</b> và xóa email này.</p>
+        <p>${text.notRequested}, hãy liên hệ bookstationadmin@gmail.com.</p>
+      `,
+      // Chỉ in ra log khi chạy dev không có key Resend; production bắt buộc có key
+      devNote: `${text.subject}: tài khoản ${accountType}, mật khẩu ${password}`,
     });
   }
 

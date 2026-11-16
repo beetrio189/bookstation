@@ -3,4 +3,5 @@ export enum RoleCode {
   PUBLISHER = 'publisher',
   EDITOR = 'editor',
   ADMIN = 'admin',
+  MODERATOR = 'moderator',
 }

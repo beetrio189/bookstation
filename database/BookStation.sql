@@ -17,7 +17,8 @@ CREATE TYPE "role" AS ENUM (
   'reader',
   'publisher',
   'editor',
-  'admin'
+  'admin',
+  'moderator'
 );
 
 CREATE TYPE "identity_provider" AS ENUM (
@@ -49,14 +50,23 @@ CREATE TYPE "report_target_type" AS ENUM (
 );
 
 CREATE TYPE "system_action_type" AS ENUM (
-  'book_review',
+  'moderator_creation',
+  'moderator_deletion',
+  'moderator_password_reset',
+  'publisher_creation',
+  'publisher_update',
+  'publisher_deletion',
+  'publisher_suspended',
   'editor_creation',
-  'review_deletion',
-  'admin_creation',
+  'editor_update',
+  'editor_deletion',
   'reader_lock',
+  'reader_unlock',
   'book_creation',
   'book_update',
-  'book_deletion'
+  'book_deletion',
+  'book_review',
+  'review_deletion'
 );
 
 /* Bảng */
@@ -124,7 +134,7 @@ CREATE TABLE "books" (
   "contributors" jsonb NOT NULL,
   "published_year" smallint,
   "rating_avg" numeric(3,2),
-  "rating_count" integer NOT NULL DEFAULT 0,
+  "rating_count" integer NOT NULL DEFAULT 0 CHECK ("rating_count" >= 0),
   "search_text" text NOT NULL,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
@@ -150,7 +160,7 @@ CREATE TABLE "book_reviews" (
   "id" uuid PRIMARY KEY DEFAULT (uuidv7()),
   "user_id" uuid NOT NULL,
   "book_id" uuid NOT NULL,
-  "rating" smallint NOT NULL,
+  "rating" smallint NOT NULL CHECK ("rating" BETWEEN 1 AND 5),
   "comment" text,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
@@ -166,7 +176,8 @@ CREATE TABLE "surveys" (
   "survey_status" survey_status NOT NULL DEFAULT 'active',
   "survey_content" jsonb NOT NULL,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
-  "updated_at" timestamptz NOT NULL DEFAULT (now())
+  "updated_at" timestamptz NOT NULL DEFAULT (now()),
+  CHECK ("ends_at" > "starts_at")
 );
 
 CREATE TABLE "survey_answers" (
@@ -192,8 +203,10 @@ CREATE TABLE "violation_reports" (
 CREATE TABLE "system_logs" (
   "id" uuid PRIMARY KEY DEFAULT (uuidv7()),
   "actor_id" uuid NOT NULL,
+  "actor_name" text NOT NULL,
   "action_type" system_action_type NOT NULL,
   "target_id" uuid NOT NULL,
+  "target_name" text NOT NULL,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
@@ -225,7 +238,9 @@ CREATE UNIQUE INDEX ON "book_genres" ("book_id", "genre_id");
 
 CREATE UNIQUE INDEX ON "book_reviews" ("user_id", "book_id");
 
-CREATE INDEX ON "book_reviews" ("id");
+CREATE INDEX ON "book_reviews" ("book_id");
+
+CREATE UNIQUE INDEX ON "survey_answers" ("user_id", "survey_id");
 
 CREATE INDEX ON "surveys" ("publisher_id");
 
@@ -360,7 +375,7 @@ COMMENT ON COLUMN "system_logs"."action_type" IS 'Bảng này sẽ không thực
 
 ALTER TABLE "refresh_tokens" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "providers" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "providers" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "publishers" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 

@@ -6,12 +6,16 @@ import {
   OneTimeTokenService,
 } from '../modules/auth/one-time-token.service';
 import {
+  AccountCredentialsJobData,
+  AccountType,
   MAIL_QUEUE,
   MailJob,
   MailJobData,
   PasswordChangedJobData,
 } from '../modules/mail/mail-queue.constants';
 import { MailService } from '../modules/mail/mail.service';
+import { UsersService } from '../modules/users/users.service';
+import { generatePassword, hashPassword } from '../utils/password';
 
 export const VERIFY_EMAIL_TTL_SECONDS = 24 * 60 * 60;
 export const RESET_PASSWORD_TTL_SECONDS = 24 * 60 * 60;
@@ -27,6 +31,7 @@ export class MailProcessor extends WorkerHost {
   constructor(
     private readonly oneTimeTokenService: OneTimeTokenService,
     private readonly mailService: MailService,
+    private readonly usersService: UsersService,
   ) {
     super();
   }
@@ -40,6 +45,26 @@ export class MailProcessor extends WorkerHost {
       case MailJob.PASSWORD_CHANGED:
         return this.sendPasswordChangedEmail(
           job.data as PasswordChangedJobData,
+        );
+      case MailJob.ACCOUNT_CREDENTIALS:
+        return this.sendNewPassword(
+          job as Job<AccountCredentialsJobData>,
+          (email, accountType, password) =>
+            this.mailService.sendAccountCredentialsEmail(
+              email,
+              accountType,
+              password,
+            ),
+        );
+      case MailJob.ACCOUNT_PASSWORD_RESET:
+        return this.sendNewPassword(
+          job as Job<AccountCredentialsJobData>,
+          (email, accountType, password) =>
+            this.mailService.sendAccountPasswordResetEmail(
+              email,
+              accountType,
+              password,
+            ),
         );
       default:
         throw new Error(`Không có xử lý cho job ${job.name}`);
@@ -84,6 +109,46 @@ export class MailProcessor extends WorkerHost {
     );
 
     await this.mailService.sendPasswordResetEmail(email, userId, token);
+  }
+
+  /**
+   * Mỗi lần chạy (kể cả chạy lại sau lỗi) sinh mật khẩu mới rồi mới gửi:
+   * mail gửi thành công cuối cùng luôn khớp mật khẩu trong DB.
+   * Lần thử cuối vẫn lỗi thì xóa mật khẩu vừa đặt (không ai biết nó), để
+   * hasPassword = false báo admin cần reset lại.
+   */
+  private async sendNewPassword(
+    job: Job<AccountCredentialsJobData>,
+    sendEmail: (
+      email: string,
+      accountType: AccountType,
+      password: string,
+    ) => Promise<void>,
+  ): Promise<void> {
+    const { userId, email, accountType } = job.data;
+    const password = generatePassword();
+    const passwordHash = await hashPassword(password);
+    const isSet = await this.usersService.setLocalPasswordHash(
+      userId,
+      passwordHash,
+    );
+
+    if (!isSet) {
+      this.logger.warn(`Bỏ job gửi mật khẩu: user ${userId} không còn`);
+      return;
+    }
+
+    try {
+      await sendEmail(email, accountType, password);
+    } catch (error) {
+      const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+
+      if (isLastAttempt) {
+        await this.usersService.clearLocalPasswordHash(userId, passwordHash);
+      }
+
+      throw error;
+    }
   }
 
   private sendPasswordChangedEmail({

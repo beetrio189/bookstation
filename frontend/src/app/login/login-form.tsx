@@ -148,7 +148,7 @@ export function LoginForm() {
             {resendButton("gửi lại")} lần nữa hoặc kiểm tra lại có nhập đúng
             email không. Nếu sau 10 phút vẫn không có kết quả thì có thể server
             đang bị quá tải, liên hệ quản trị viên qua email
-            admin_bookstation@gmail.com hoặc thử lại sau.
+            bookstationadmin@gmail.com hoặc thử lại sau.
           </FormMessage>
         )}
 

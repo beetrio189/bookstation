@@ -1,10 +1,10 @@
 import { IsNormalizedEmail } from '../../../decorators/is-normalized-email.decorator';
-import { IsPassword } from '../../../decorators/is-password.decorator';
+import { IsNewPassword } from '../../../decorators/is-password.decorator';
 
 export class LoginDto {
   @IsNormalizedEmail()
   email: string;
 
-  @IsPassword()
+  @IsNewPassword()
   password: string;
 }

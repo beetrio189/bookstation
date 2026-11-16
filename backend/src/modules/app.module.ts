@@ -14,6 +14,7 @@ import { RolesGuard } from '../guards/roles.guard';
 import { ResponseInterceptor } from '../interceptors/response.interceptor';
 import { BULLMQ_ROOT_OPTIONS } from '../libs/bullmq.config';
 import dataSource from '../libs/typeorm.config';
+import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthCheckModule } from './health-check/health-check.module';
 import { REDIS_CLIENT, RedisModule } from './redis/redis.module';
@@ -44,6 +45,7 @@ import { UsersModule } from './users/users.module';
     HealthCheckModule,
     UsersModule,
     AuthModule,
+    AdminModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

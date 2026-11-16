@@ -29,6 +29,34 @@ describe('MailQueueService', () => {
     });
   });
 
+  it('queues account credentials without a password', async () => {
+    const queue = { add: jest.fn() };
+
+    await new MailQueueService(
+      queue as unknown as Queue,
+    ).enqueueAccountCredentialsEmail('user-1', 'a@example.com', 'moderator');
+
+    expect(queue.add).toHaveBeenCalledWith(MailJob.ACCOUNT_CREDENTIALS, {
+      userId: 'user-1',
+      email: 'a@example.com',
+      accountType: 'moderator',
+    });
+  });
+
+  it('queues an admin password reset with the same data, without a password', async () => {
+    const queue = { add: jest.fn() };
+
+    await new MailQueueService(
+      queue as unknown as Queue,
+    ).enqueueAccountPasswordResetEmail('user-1', 'a@example.com', 'moderator');
+
+    expect(queue.add).toHaveBeenCalledWith(MailJob.ACCOUNT_PASSWORD_RESET, {
+      userId: 'user-1',
+      email: 'a@example.com',
+      accountType: 'moderator',
+    });
+  });
+
   it('queues a password changed email', async () => {
     const queue = { add: jest.fn() };
 

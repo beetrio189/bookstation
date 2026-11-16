@@ -36,6 +36,12 @@ class TestController {
   admin() {
     return { ok: true };
   }
+
+  @Roles(RoleCode.ADMIN, RoleCode.MODERATOR)
+  @Get('back-office')
+  backOffice() {
+    return { ok: true };
+  }
 }
 
 @Roles(RoleCode.EDITOR, RoleCode.ADMIN)
@@ -55,6 +61,8 @@ const payloadFor = (id: string, role: RoleCode): JwtPayload => ({
 const READER = payloadFor('reader', RoleCode.READER);
 const EDITOR = payloadFor('editor', RoleCode.EDITOR);
 const ADMIN = payloadFor('admin', RoleCode.ADMIN);
+const MODERATOR = payloadFor('moderator', RoleCode.MODERATOR);
+const PUBLISHER = payloadFor('publisher', RoleCode.PUBLISHER);
 
 describe('JwtAuthGuard + RolesGuard', () => {
   let app: INestApplication;
@@ -174,6 +182,13 @@ describe('JwtAuthGuard + RolesGuard', () => {
         },
       });
     await get('/test/admin', jwt.sign(ADMIN)).expect(200);
+  });
+
+  it('accepts every role listed in @Roles() on a route', async () => {
+    await get('/test/back-office', jwt.sign(ADMIN)).expect(200);
+    await get('/test/back-office', jwt.sign(MODERATOR)).expect(200);
+    await get('/test/back-office', jwt.sign(PUBLISHER)).expect(403);
+    await get('/test/admin', jwt.sign(MODERATOR)).expect(403);
   });
 
   it('applies @Roles() on a controller and accepts any listed role', async () => {

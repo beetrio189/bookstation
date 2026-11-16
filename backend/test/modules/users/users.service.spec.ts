@@ -5,9 +5,10 @@ import { UsersService } from '../../../src/modules/users/users.service';
 
 describe('UsersService', () => {
   const usersRepository = { findOne: jest.fn() };
+  const providersRepository = { update: jest.fn() };
   const service = new UsersService(
     usersRepository as unknown as Repository<User>,
-    {} as Repository<Provider>,
+    providersRepository as unknown as Repository<Provider>,
   );
 
   beforeEach(() => jest.resetAllMocks());
@@ -49,6 +50,41 @@ describe('UsersService', () => {
       await expect(service.getProfile('user-1')).rejects.toMatchObject({
         code: 1001,
       });
+    });
+  });
+
+  describe('setLocalPasswordHash', () => {
+    it('updates only the local login of the user', async () => {
+      providersRepository.update.mockResolvedValue({ affected: 1 });
+
+      await expect(
+        service.setLocalPasswordHash('user-1', 'hash'),
+      ).resolves.toBe(true);
+      expect(providersRepository.update).toHaveBeenCalledWith(
+        { userId: 'user-1', provider: 'local' },
+        { passwordHash: 'hash' },
+      );
+    });
+
+    it('returns false when the local login no longer exists', async () => {
+      providersRepository.update.mockResolvedValue({ affected: 0 });
+
+      await expect(
+        service.setLocalPasswordHash('user-1', 'hash'),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe('clearLocalPasswordHash', () => {
+    it('clears the password only while it is still the given hash', async () => {
+      providersRepository.update.mockResolvedValue({ affected: 1 });
+
+      await service.clearLocalPasswordHash('user-1', 'hash');
+
+      expect(providersRepository.update).toHaveBeenCalledWith(
+        { userId: 'user-1', provider: 'local', passwordHash: 'hash' },
+        { passwordHash: null },
+      );
     });
   });
 

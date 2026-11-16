@@ -9,14 +9,22 @@ import {
   MailJobData,
 } from '../../src/modules/mail/mail-queue.constants';
 import { MailService } from '../../src/modules/mail/mail.service';
+import { UsersService } from '../../src/modules/users/users.service';
+import {
+  PASSWORD_PATTERN,
+  PASSWORD_STRENGTH_PATTERN,
+  verifyPassword,
+} from '../../src/utils/password';
 import { MailProcessor } from '../../src/worker/mail.processor';
 
-const job = (name: string, data: MailJobData) =>
+// attemptsMade = số lần đã lỗi trước lần chạy này; cấu hình thật là 3 lần
+const job = (name: string, data: MailJobData, attemptsMade = 1) =>
   ({
     id: '1',
     name,
     data,
-    attemptsMade: 1,
+    attemptsMade,
+    opts: { attempts: 3 },
   }) as unknown as Job<MailJobData>;
 
 describe('MailProcessor', () => {
@@ -25,10 +33,17 @@ describe('MailProcessor', () => {
     sendVerificationEmail: jest.fn(),
     sendPasswordResetEmail: jest.fn(),
     sendPasswordChangedEmail: jest.fn(),
+    sendAccountCredentialsEmail: jest.fn(),
+    sendAccountPasswordResetEmail: jest.fn(),
+  };
+  const usersService = {
+    setLocalPasswordHash: jest.fn(),
+    clearLocalPasswordHash: jest.fn(),
   };
   const processor = new MailProcessor(
     oneTimeTokenService as unknown as OneTimeTokenService,
     mailService as unknown as MailService,
+    usersService as unknown as UsersService,
   );
   const DATA = { userId: 'user-1', email: 'a@example.com' };
 
@@ -80,6 +95,113 @@ describe('MailProcessor', () => {
       new Date('2026-11-14T03:00:00.000Z'),
     );
     expect(oneTimeTokenService.create).not.toHaveBeenCalled();
+  });
+
+  describe('account credentials', () => {
+    const CREDENTIALS = { ...DATA, accountType: 'moderator' } as MailJobData;
+
+    it('saves the hash of a new strong password, then emails that password', async () => {
+      usersService.setLocalPasswordHash.mockResolvedValue(true);
+
+      await processor.process(job(MailJob.ACCOUNT_CREDENTIALS, CREDENTIALS));
+
+      const [userId, passwordHash] = usersService.setLocalPasswordHash.mock
+        .calls[0] as [string, string];
+      const [to, accountType, password] = mailService
+        .sendAccountCredentialsEmail.mock.calls[0] as [string, string, string];
+
+      expect(userId).toBe('user-1');
+      expect(to).toBe('a@example.com');
+      expect(accountType).toBe('moderator');
+      expect(password).toMatch(PASSWORD_PATTERN);
+      expect(password).toMatch(PASSWORD_STRENGTH_PATTERN);
+      await expect(verifyPassword(passwordHash, password)).resolves.toBe(true);
+      // Mật khẩu không nằm trong dữ liệu job (Redis)
+      expect(JSON.stringify(CREDENTIALS)).not.toContain(password);
+    });
+
+    it('uses a new password on every retry', async () => {
+      usersService.setLocalPasswordHash.mockResolvedValue(true);
+      mailService.sendAccountCredentialsEmail.mockRejectedValueOnce(
+        new Error('Resend: down'),
+      );
+
+      await expect(
+        processor.process(job(MailJob.ACCOUNT_CREDENTIALS, CREDENTIALS)),
+      ).rejects.toThrow('down');
+      await processor.process(job(MailJob.ACCOUNT_CREDENTIALS, CREDENTIALS));
+
+      const [first, second] =
+        mailService.sendAccountCredentialsEmail.mock.calls.map(
+          ([, , password]) => password as string,
+        );
+
+      expect(first).not.toBe(second);
+      expect(usersService.setLocalPasswordHash).toHaveBeenCalledTimes(2);
+      // Chưa phải lần thử cuối: giữ mật khẩu, chờ chạy lại
+      expect(usersService.clearLocalPasswordHash).not.toHaveBeenCalled();
+    });
+
+    it.each([MailJob.ACCOUNT_CREDENTIALS, MailJob.ACCOUNT_PASSWORD_RESET])(
+      'clears its own password when the last attempt of %s fails',
+      async (name) => {
+        usersService.setLocalPasswordHash.mockResolvedValue(true);
+        const failure = new Error('Resend: down');
+        mailService.sendAccountCredentialsEmail.mockRejectedValue(failure);
+        mailService.sendAccountPasswordResetEmail.mockRejectedValue(failure);
+
+        await expect(processor.process(job(name, CREDENTIALS, 2))).rejects.toBe(
+          failure,
+        );
+
+        const [, savedHash] = usersService.setLocalPasswordHash.mock
+          .calls[0] as [string, string];
+
+        // Xóa đúng hash vừa đặt, để không đụng mật khẩu của job khác
+        expect(usersService.clearLocalPasswordHash).toHaveBeenCalledWith(
+          'user-1',
+          savedHash,
+        );
+      },
+    );
+
+    it('skips the email when the account no longer exists', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      usersService.setLocalPasswordHash.mockResolvedValue(false);
+
+      await processor.process(job(MailJob.ACCOUNT_CREDENTIALS, CREDENTIALS));
+
+      expect(mailService.sendAccountCredentialsEmail).not.toHaveBeenCalled();
+    });
+
+    it('sets and emails a new password with the reset wording after an admin reset', async () => {
+      usersService.setLocalPasswordHash.mockResolvedValue(true);
+
+      await processor.process(job(MailJob.ACCOUNT_PASSWORD_RESET, CREDENTIALS));
+
+      const [, passwordHash] = usersService.setLocalPasswordHash.mock
+        .calls[0] as [string, string];
+      const [to, accountType, password] = mailService
+        .sendAccountPasswordResetEmail.mock.calls[0] as [
+        string,
+        string,
+        string,
+      ];
+
+      expect(to).toBe('a@example.com');
+      expect(accountType).toBe('moderator');
+      await expect(verifyPassword(passwordHash, password)).resolves.toBe(true);
+      expect(mailService.sendAccountCredentialsEmail).not.toHaveBeenCalled();
+    });
+
+    it('skips the reset email when the account no longer exists', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      usersService.setLocalPasswordHash.mockResolvedValue(false);
+
+      await processor.process(job(MailJob.ACCOUNT_PASSWORD_RESET, CREDENTIALS));
+
+      expect(mailService.sendAccountPasswordResetEmail).not.toHaveBeenCalled();
+    });
   });
 
   it('throws so BullMQ retries when the email cannot be sent', async () => {

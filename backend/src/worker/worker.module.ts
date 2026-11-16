@@ -10,6 +10,9 @@ import { MailQueueModule } from '../modules/mail/mail-queue.module';
 import { MailModule } from '../modules/mail/mail.module';
 import { MaintenanceQueueModule } from '../modules/maintenance/maintenance-queue.module';
 import { RedisModule } from '../modules/redis/redis.module';
+import { Provider } from '../modules/users/entities/provider.entity';
+import { User } from '../modules/users/entities/user.entity';
+import { UsersService } from '../modules/users/users.service';
 import { MailProcessor } from './mail.processor';
 import { MaintenanceProcessor } from './maintenance.processor';
 
@@ -17,7 +20,7 @@ import { MaintenanceProcessor } from './maintenance.processor';
 @Module({
   imports: [
     TypeOrmModule.forRoot({ ...dataSource.options, autoLoadEntities: true }),
-    TypeOrmModule.forFeature([RefreshToken]),
+    TypeOrmModule.forFeature([RefreshToken, User, Provider]),
     BullModule.forRoot(BULLMQ_ROOT_OPTIONS),
     RedisModule,
     MailModule,
@@ -29,6 +32,7 @@ import { MaintenanceProcessor } from './maintenance.processor';
     OneTimeTokenService,
     MaintenanceProcessor,
     RefreshTokenService,
+    UsersService,
   ],
 })
 export class WorkerModule {}
