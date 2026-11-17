@@ -152,6 +152,41 @@ describe('MailService', () => {
     expect(html).toContain('href="http://localhost:3000/login"');
   });
 
+  it('puts the escaped reason at the end of a reset email', async () => {
+    env.resendApiKey = 're_test';
+    send.mockResolvedValue({ data: { id: '1' }, error: null });
+
+    await new MailService().sendAccountPasswordResetEmail(
+      'nxb@example.com',
+      'publisher',
+      'Ab3$xyz-Pq9!kLm2',
+      'NXB báo <không> nhận được mail',
+    );
+
+    const [{ html }] = send.mock.calls[0] as [{ html: string }];
+
+    expect(html).toContain('tài khoản nhà xuất bản BookStation');
+    expect(html.trim()).toMatch(
+      /<p>Lý do: NXB báo &lt;không&gt; nhận được mail<\/p>$/,
+    );
+  });
+
+  it('has no reason line when there is no reason', async () => {
+    env.resendApiKey = 're_test';
+    send.mockResolvedValue({ data: { id: '1' }, error: null });
+
+    await new MailService().sendAccountPasswordResetEmail(
+      'bt@example.com',
+      'editor',
+      'Ab3$xyz-Pq9!kLm2',
+    );
+
+    const [{ html }] = send.mock.calls[0] as [{ html: string }];
+
+    expect(html).toContain('tài khoản biên tập viên BookStation');
+    expect(html).not.toContain('Lý do');
+  });
+
   it('escapes HTML in the credentials email', async () => {
     env.resendApiKey = 're_test';
     send.mockResolvedValue({ data: { id: '1' }, error: null });
@@ -178,5 +213,67 @@ describe('MailService', () => {
         'abc-123',
       ),
     ).rejects.toThrow('Resend: bad domain');
+  });
+
+  it('tells a publisher it was suspended, with the escaped name and reason at the end', async () => {
+    env.resendApiKey = 're_test';
+    send.mockResolvedValue({ data: { id: '1' }, error: null });
+
+    await new MailService().sendPublisherSuspendedEmail(
+      'nxb@example.com',
+      'NXB <Kim Đồng>',
+      'Tài khoản bị chiếm & có biên tập viên lạ',
+    );
+
+    const [{ to, subject, html }] = send.mock.calls[0] as [
+      { to: string; subject: string; html: string },
+    ];
+
+    expect(to).toBe('nxb@example.com');
+    expect(subject).toBe('Nhà xuất bản của bạn đã bị đình chỉ trên BookStation');
+    expect(html).toContain('<b>NXB &lt;Kim Đồng&gt;</b> đã bị đình chỉ');
+    expect(html.trim()).toMatch(
+      /<p>Lý do: Tài khoản bị chiếm &amp; có biên tập viên lạ<\/p>$/,
+    );
+  });
+
+  it('tells a publisher it was unsuspended, with a login link and the reason', async () => {
+    env.resendApiKey = 're_test';
+    send.mockResolvedValue({ data: { id: '1' }, error: null });
+
+    await new MailService().sendPublisherUnsuspendedEmail(
+      'nxb@example.com',
+      'Kim Đồng',
+      'Đã xác minh',
+    );
+
+    const [{ subject, html }] = send.mock.calls[0] as [
+      { subject: string; html: string },
+    ];
+
+    expect(subject).toBe('Nhà xuất bản của bạn đã được mở khóa trên BookStation');
+    expect(html).toContain('href="http://localhost:3000/login"');
+    expect(html.trim()).toMatch(/<p>Lý do: Đã xác minh<\/p>$/);
+  });
+
+  it('tells a moderator the account was deleted, without a reason', async () => {
+    env.resendApiKey = 're_test';
+    send.mockResolvedValue({ data: { id: '1' }, error: null });
+
+    await new MailService().sendAccountDeletedEmail(
+      'kdv@example.com',
+      'moderator',
+    );
+
+    const [{ to, subject, html }] = send.mock.calls[0] as [
+      { to: string; subject: string; html: string },
+    ];
+
+    expect(to).toBe('kdv@example.com');
+    expect(subject).toBe(
+      'Tài khoản kiểm duyệt viên BookStation của bạn đã bị xóa',
+    );
+    expect(html).toContain('<b>kdv@example.com</b> đã bị quản trị viên xóa');
+    expect(html).not.toContain('Lý do');
   });
 });

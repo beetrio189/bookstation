@@ -38,6 +38,10 @@ export class SystemLog {
   @Column({ name: 'target_name', type: 'text' })
   targetName: string;
 
+  // Lý do do người làm nhập, có thể là chuỗi rỗng
+  @Column({ type: 'text', default: '' })
+  note: string;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

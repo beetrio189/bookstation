@@ -1,4 +1,3 @@
-import Image from "next/image";
 import type { CSSProperties } from "react";
 
 // Figma dựng ở khung 1920x1080. --u = 1px của Figma, co giãn theo chiều cao
@@ -27,7 +26,7 @@ function Cover({
       className={`overflow-hidden ${className}`}
       style={{ ...style, borderRadius: u(20) }}
     >
-      <Image src={src} alt="" fill sizes="30vw" className="object-cover" />
+      <img src={src} alt="" className="absolute inset-0 size-full object-cover" />
     </div>
   );
 }
@@ -66,7 +65,7 @@ export function AuthArtwork() {
       />
       <div className="absolute" style={box(274, 0, 1646, 1080)}>
         <div className="absolute inset-[-1.85%_-0.91%_-1.85%_-1.52%]">
-          <Image src="/images/auth/blob.svg" alt="" fill priority />
+          <img src="/images/auth/blob.svg" alt="" className="absolute inset-0 size-full" />
         </div>
       </div>
       {/* Màn hình rộng hơn 16:9 thì phần bên phải khối trắng vẫn là nền trắng */}

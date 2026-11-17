@@ -13,7 +13,7 @@ export function VerificationEmailSent({
   return (
     <AuthResult
       title={title}
-      action={{ href: "/login", label: "Về trang đăng nhập" }}
+      action={{ to: "/login", label: "Về trang đăng nhập" }}
     >
       Email xác thực đã được gửi đi. Nếu không thấy thì vào mục {resendLink}{" "}
       hoặc kiểm tra lại có nhập đúng email không. Nếu sau 10 phút vẫn không có

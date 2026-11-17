@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link, type LinkProps } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -10,7 +10,7 @@ export function AuthResult({
 }: {
   title: string;
   children?: ReactNode;
-  action?: { href: string; label: string };
+  action?: { to: LinkProps["to"]; label: string };
 }) {
   return (
     <div className="flex w-full max-w-100 flex-col gap-5 leading-tight">
@@ -21,7 +21,7 @@ export function AuthResult({
 
       {action && (
         <Button asChild className="h-12.5 rounded-lg text-xl font-bold">
-          <Link href={action.href}>{action.label}</Link>
+          <Link to={action.to}>{action.label}</Link>
         </Button>
       )}
     </div>

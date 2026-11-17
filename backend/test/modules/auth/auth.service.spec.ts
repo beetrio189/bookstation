@@ -47,6 +47,7 @@ describe('AuthService', () => {
     resetLocalPassword: jest.fn(),
     findGoogleProvider: jest.fn(),
     createGoogleReader: jest.fn(),
+    findProviderTypes: jest.fn(),
   };
   const googleOAuthService = { getProfile: jest.fn() };
   const oneTimeTokenService = {
@@ -285,6 +286,7 @@ describe('AuthService', () => {
 
     beforeEach(() => {
       jwtService.signAsync.mockResolvedValue(TOKENS.accessToken);
+      usersService.findProviderTypes.mockResolvedValue(['local']);
       refreshTokenService.create.mockResolvedValue(TOKENS.refreshToken);
     });
 
@@ -307,7 +309,9 @@ describe('AuthService', () => {
         expect(jwtService.signAsync).toHaveBeenCalledWith({
           sub: USER.id,
           role: 'reader',
+          providers: ['local'],
         });
+        expect(usersService.findProviderTypes).toHaveBeenCalledWith(USER.id);
         expect(refreshTokenService.create).toHaveBeenCalledWith(USER.id);
       });
 
@@ -382,6 +386,7 @@ describe('AuthService', () => {
 
       it('logs in a user already linked to the Google account', async () => {
         usersService.findGoogleProvider.mockResolvedValue({ user: USER });
+        usersService.findProviderTypes.mockResolvedValue(['google']);
 
         await expect(service.loginWithGoogle('code-1')).resolves.toEqual(
           TOKENS,
@@ -393,6 +398,7 @@ describe('AuthService', () => {
         expect(jwtService.signAsync).toHaveBeenCalledWith({
           sub: USER.id,
           role: 'reader',
+          providers: ['google'],
         });
         expect(usersService.createGoogleReader).not.toHaveBeenCalled();
       });
@@ -494,6 +500,7 @@ describe('AuthService', () => {
         expect(jwtService.signAsync).toHaveBeenCalledWith({
           sub: USER.id,
           role: 'publisher',
+          providers: ['local'],
         });
         expect(refreshTokenService.create).not.toHaveBeenCalled();
         expect(refreshTokenService.revoke).not.toHaveBeenCalled();

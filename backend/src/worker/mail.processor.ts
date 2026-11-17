@@ -7,11 +7,13 @@ import {
 } from '../modules/auth/one-time-token.service';
 import {
   AccountCredentialsJobData,
+  AccountDeletedJobData,
   AccountType,
   MAIL_QUEUE,
   MailJob,
   MailJobData,
   PasswordChangedJobData,
+  PublisherStatusJobData,
 } from '../modules/mail/mail-queue.constants';
 import { MailService } from '../modules/mail/mail.service';
 import { UsersService } from '../modules/users/users.service';
@@ -64,8 +66,34 @@ export class MailProcessor extends WorkerHost {
               email,
               accountType,
               password,
+              (job.data as AccountCredentialsJobData).reason,
             ),
         );
+      case MailJob.ACCOUNT_DELETED: {
+        const { email, accountType } = job.data as AccountDeletedJobData;
+
+        return this.mailService.sendAccountDeletedEmail(email, accountType);
+      }
+      case MailJob.PUBLISHER_SUSPENDED: {
+        const { email, publisherName, reason } =
+          job.data as PublisherStatusJobData;
+
+        return this.mailService.sendPublisherSuspendedEmail(
+          email,
+          publisherName,
+          reason,
+        );
+      }
+      case MailJob.PUBLISHER_UNSUSPENDED: {
+        const { email, publisherName, reason } =
+          job.data as PublisherStatusJobData;
+
+        return this.mailService.sendPublisherUnsuspendedEmail(
+          email,
+          publisherName,
+          reason,
+        );
+      }
       default:
         throw new Error(`Không có xử lý cho job ${job.name}`);
     }

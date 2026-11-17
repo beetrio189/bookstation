@@ -9,6 +9,7 @@ const buildLink = (path: string, userId: string, token: string) =>
 
 const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   publisher: 'nhà xuất bản',
+  editor: 'biên tập viên',
   moderator: 'kiểm duyệt viên',
 };
 
@@ -115,6 +116,7 @@ export class MailService {
     to: string,
     accountType: AccountType,
     password: string,
+    reason?: string,
   ): Promise<void> {
     const label = ACCOUNT_TYPE_LABELS[accountType];
 
@@ -123,6 +125,70 @@ export class MailService {
       intro: `Mật khẩu tài khoản ${label} BookStation của bạn đã được đặt lại. Mật khẩu cũ không còn dùng được.`,
       afterLogin: 'đăng nhập',
       notRequested: 'Nếu bạn không yêu cầu đặt lại mật khẩu',
+      reason,
+    });
+  }
+
+  // Tài khoản bị admin xóa hẳn: không còn đăng nhập được. Không kèm lý do
+  async sendAccountDeletedEmail(
+    to: string,
+    accountType: AccountType,
+  ): Promise<void> {
+    const label = ACCOUNT_TYPE_LABELS[accountType];
+
+    await this.send({
+      to,
+      subject: `Tài khoản ${label} BookStation của bạn đã bị xóa`,
+      html: `
+        <p>Chào bạn,</p>
+        <p>Tài khoản ${label} BookStation gắn với email <b>${escapeHtml(to)}</b> đã bị quản trị viên xóa. Bạn không còn đăng nhập được bằng tài khoản này.</p>
+        <p>Nếu bạn cho rằng đây là nhầm lẫn, hãy liên hệ bookstationadmin@gmail.com.</p>
+      `,
+      devNote: `tài khoản ${accountType} đã bị xóa`,
+    });
+  }
+
+  /**
+   * Báo NXB bị đình chỉ: tài khoản NXB và mọi biên tập viên bị khóa, sách vẫn
+   * hiện, khảo sát tạm ẩn với độc giả. Lý do (escape HTML) ở cuối.
+   */
+  async sendPublisherSuspendedEmail(
+    to: string,
+    publisherName: string,
+    reason: string,
+  ): Promise<void> {
+    await this.send({
+      to,
+      subject: 'Nhà xuất bản của bạn đã bị đình chỉ trên BookStation',
+      html: `
+        <p>Chào bạn,</p>
+        <p>Nhà xuất bản <b>${escapeHtml(publisherName)}</b> đã bị đình chỉ trên BookStation. Tài khoản nhà xuất bản và mọi biên tập viên đã bị khóa và đăng xuất khỏi mọi thiết bị.</p>
+        <p>Sách của nhà xuất bản vẫn hiển thị với độc giả; khảo sát tạm ẩn cho đến khi được mở khóa.</p>
+        <p>Nếu có thắc mắc, hãy liên hệ bookstationadmin@gmail.com.</p>
+        <p>Lý do: ${escapeHtml(reason)}</p>
+      `,
+      devNote: `nhà xuất bản ${publisherName} bị đình chỉ, lý do: ${reason}`,
+    });
+  }
+
+  async sendPublisherUnsuspendedEmail(
+    to: string,
+    publisherName: string,
+    reason: string,
+  ): Promise<void> {
+    const loginLink = `${env.feUrl}/login`;
+
+    await this.send({
+      to,
+      subject: 'Nhà xuất bản của bạn đã được mở khóa trên BookStation',
+      html: `
+        <p>Chào bạn,</p>
+        <p>Nhà xuất bản <b>${escapeHtml(publisherName)}</b> đã được mở khóa trên BookStation. Tài khoản nhà xuất bản và các biên tập viên đã đăng nhập lại được, khảo sát hiển thị lại với độc giả.</p>
+        <p><a href="${loginLink}">Đăng nhập BookStation</a></p>
+        <p>Nếu có thắc mắc, hãy liên hệ bookstationadmin@gmail.com.</p>
+        <p>Lý do: ${escapeHtml(reason)}</p>
+      `,
+      devNote: `nhà xuất bản ${publisherName} được mở khóa, lý do: ${reason}`,
     });
   }
 
@@ -135,6 +201,8 @@ export class MailService {
       intro: string;
       afterLogin: string;
       notRequested: string;
+      // Ghi chú do admin/KDV nhập: escape HTML, đặt ở cuối
+      reason?: string;
     },
   ): Promise<void> {
     const loginLink = `${env.feUrl}/login`;
@@ -149,6 +217,7 @@ export class MailService {
         <p><a href="${loginLink}">Đăng nhập BookStation</a></p>
         <p><b>Vì lý do bảo mật, hãy đổi mật khẩu ngay sau khi ${text.afterLogin}</b> và xóa email này.</p>
         <p>${text.notRequested}, hãy liên hệ bookstationadmin@gmail.com.</p>
+        ${text.reason ? `<p>Lý do: ${escapeHtml(text.reason)}</p>` : ''}
       `,
       // Chỉ in ra log khi chạy dev không có key Resend; production bắt buộc có key
       devNote: `${text.subject}: tài khoản ${accountType}, mật khẩu ${password}`,

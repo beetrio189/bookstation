@@ -5,7 +5,7 @@ import { UsersService } from '../../../src/modules/users/users.service';
 
 describe('UsersService', () => {
   const usersRepository = { findOne: jest.fn() };
-  const providersRepository = { update: jest.fn() };
+  const providersRepository = { update: jest.fn(), find: jest.fn() };
   const service = new UsersService(
     usersRepository as unknown as Repository<User>,
     providersRepository as unknown as Repository<Provider>,
@@ -106,6 +106,25 @@ describe('UsersService', () => {
       usersRepository.findOne.mockResolvedValue(null);
 
       await expect(service.findStatus('user-1')).resolves.toBeNull();
+    });
+  });
+
+  describe('findProviderTypes', () => {
+    it('lists each login type of the user once', async () => {
+      providersRepository.find.mockResolvedValue([
+        { provider: 'local' },
+        { provider: 'google' },
+        { provider: 'google' },
+      ]);
+
+      await expect(service.findProviderTypes('user-1')).resolves.toEqual([
+        'local',
+        'google',
+      ]);
+      expect(providersRepository.find).toHaveBeenCalledWith({
+        select: { provider: true },
+        where: { userId: 'user-1' },
+      });
     });
   });
 });

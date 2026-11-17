@@ -11,7 +11,11 @@ import { RoleCode } from '../../../src/utils/enums/role-code.enum';
 import { SystemActionType } from '../../../src/utils/enums/system-action-type.enum';
 
 const ADMIN_ID = 'admin-1';
-const DTO = { email: 'kdv@bookstation.vn', name: 'Kiểm duyệt viên A' };
+const DTO = {
+  email: 'kdv@bookstation.vn',
+  name: 'Kiểm duyệt viên A',
+  note: 'Tuyển thêm người',
+};
 const CREATED_AT = new Date('2026-11-16T03:00:00.000Z');
 
 describe('ModeratorsService', () => {
@@ -54,6 +58,7 @@ describe('ModeratorsService', () => {
   const mailQueueService = {
     enqueueAccountCredentialsEmail: jest.fn(),
     enqueueAccountPasswordResetEmail: jest.fn(),
+    enqueueAccountDeletedEmail: jest.fn(),
   };
   const service = new ModeratorsService(
     usersRepository as unknown as Repository<User>,
@@ -112,6 +117,7 @@ describe('ModeratorsService', () => {
       actionType: SystemActionType.MODERATOR_CREATION,
       targetId: 'moderator-1',
       targetName: DTO.name,
+      note: DTO.note,
     });
     expect(
       mailQueueService.enqueueAccountCredentialsEmail,
@@ -256,14 +262,15 @@ describe('ModeratorsService', () => {
       manager.findOne.mockResolvedValueOnce({
         id: 'moderator-1',
         name: 'KDV A',
+        notificationEmail: 'kdv@example.com',
       });
 
-      await expect(service.remove(ADMIN_ID, 'moderator-1')).resolves.toEqual(
-        {},
-      );
+      await expect(
+        service.remove(ADMIN_ID, 'moderator-1', 'Nghỉ việc'),
+      ).resolves.toEqual({});
 
       expect(manager.findOne).toHaveBeenNthCalledWith(1, User, {
-        select: { id: true, name: true },
+        select: { id: true, name: true, notificationEmail: true },
         where: { id: 'moderator-1', role: RoleCode.MODERATOR },
         lock: { mode: 'pessimistic_write' },
       });
@@ -274,17 +281,42 @@ describe('ModeratorsService', () => {
         actionType: SystemActionType.MODERATOR_DELETION,
         targetId: 'moderator-1',
         targetName: 'KDV A',
+        note: 'Nghỉ việc',
       });
+      expect(mailQueueService.enqueueAccountDeletedEmail).toHaveBeenCalledWith(
+        'moderator-1',
+        'kdv@example.com',
+        'moderator',
+      );
+    });
+
+    it('still succeeds when the email job cannot be queued', async () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation();
+      manager.findOne.mockResolvedValueOnce({
+        id: 'moderator-1',
+        name: 'KDV A',
+        notificationEmail: 'kdv@example.com',
+      });
+      mailQueueService.enqueueAccountDeletedEmail.mockRejectedValueOnce(
+        new Error('Redis down'),
+      );
+
+      await expect(
+        service.remove(ADMIN_ID, 'moderator-1', 'x'),
+      ).resolves.toEqual({});
     });
 
     it('returns 404 when there is no such moderator (or it was just deleted)', async () => {
       manager.findOne.mockResolvedValueOnce(null);
 
       await expect(
-        service.remove(ADMIN_ID, 'moderator-1'),
+        service.remove(ADMIN_ID, 'moderator-1', 'Nghỉ việc'),
       ).rejects.toMatchObject({ code: 1003 });
       expect(manager.delete).not.toHaveBeenCalled();
       expect(manager.insert).not.toHaveBeenCalled();
+      expect(
+        mailQueueService.enqueueAccountDeletedEmail,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -299,7 +331,7 @@ describe('ModeratorsService', () => {
 
     it('clears the password, logs out every device, logs it, then queues the email', async () => {
       await expect(
-        service.resetPassword(ADMIN_ID, 'moderator-1'),
+        service.resetPassword(ADMIN_ID, 'moderator-1', ''),
       ).resolves.toEqual({});
 
       // Chỉ reset KDV, không reset admin
@@ -322,6 +354,7 @@ describe('ModeratorsService', () => {
         actionType: SystemActionType.MODERATOR_PASSWORD_RESET,
         targetId: 'moderator-1',
         targetName: 'KDV A',
+        note: '',
       });
       expect(
         mailQueueService.enqueueAccountPasswordResetEmail,
@@ -332,7 +365,7 @@ describe('ModeratorsService', () => {
       queryBuilder.getRawOne.mockResolvedValue(undefined);
 
       await expect(
-        service.resetPassword(ADMIN_ID, 'moderator-1'),
+        service.resetPassword(ADMIN_ID, 'moderator-1', ''),
       ).rejects.toMatchObject({ code: 1003 });
       expect(manager.update).not.toHaveBeenCalled();
       expect(
@@ -347,7 +380,7 @@ describe('ModeratorsService', () => {
       );
 
       await expect(
-        service.resetPassword(ADMIN_ID, 'moderator-1'),
+        service.resetPassword(ADMIN_ID, 'moderator-1', ''),
       ).rejects.toMatchObject({ code: 1006 });
     });
   });

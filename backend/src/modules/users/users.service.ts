@@ -63,6 +63,16 @@ export class UsersService {
     };
   }
 
+  // Các cách đăng nhập của user (local, google), mỗi loại một lần
+  async findProviderTypes(userId: string): Promise<IdentityProvider[]> {
+    const providers = await this.providersRepository.find({
+      select: { provider: true },
+      where: { userId },
+    });
+
+    return [...new Set(providers.map(({ provider }) => provider))];
+  }
+
   findLocalProvider(email: string): Promise<Provider | null> {
     return this.providersRepository.findOne({
       where: { provider: IdentityProvider.LOCAL, providerKey: email },

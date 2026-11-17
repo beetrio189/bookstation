@@ -35,6 +35,9 @@ describe('MailProcessor', () => {
     sendPasswordChangedEmail: jest.fn(),
     sendAccountCredentialsEmail: jest.fn(),
     sendAccountPasswordResetEmail: jest.fn(),
+    sendPublisherSuspendedEmail: jest.fn(),
+    sendAccountDeletedEmail: jest.fn(),
+    sendPublisherUnsuspendedEmail: jest.fn(),
   };
   const usersService = {
     setLocalPasswordHash: jest.fn(),
@@ -194,6 +197,21 @@ describe('MailProcessor', () => {
       expect(mailService.sendAccountCredentialsEmail).not.toHaveBeenCalled();
     });
 
+    it('passes the reason of the reset to the email', async () => {
+      usersService.setLocalPasswordHash.mockResolvedValue(true);
+
+      await processor.process(
+        job(MailJob.ACCOUNT_PASSWORD_RESET, {
+          ...CREDENTIALS,
+          reason: 'NXB báo mất mail',
+        } as MailJobData),
+      );
+
+      expect(mailService.sendAccountPasswordResetEmail.mock.calls[0][3]).toBe(
+        'NXB báo mất mail',
+      );
+    });
+
     it('skips the reset email when the account no longer exists', async () => {
       jest.spyOn(Logger.prototype, 'warn').mockImplementation();
       usersService.setLocalPasswordHash.mockResolvedValue(false);
@@ -237,5 +255,36 @@ describe('MailProcessor', () => {
     processor.onFailed(job(MailJob.VERIFY_EMAIL, DATA), new Error('down'));
 
     expect(error).toHaveBeenCalledWith(expect.stringContaining('down'));
+  });
+
+  it.each([
+    [MailJob.PUBLISHER_SUSPENDED, 'sendPublisherSuspendedEmail'],
+    [MailJob.PUBLISHER_UNSUSPENDED, 'sendPublisherUnsuspendedEmail'],
+  ] as const)('sends the %s email with the name and reason, no password', async (name, method) => {
+    await processor.process(
+      job(name, { ...DATA, publisherName: 'Kim Đồng', reason: 'Lý do' } as MailJobData),
+    );
+
+    expect(mailService[method]).toHaveBeenCalledWith(
+      'a@example.com',
+      'Kim Đồng',
+      'Lý do',
+    );
+    expect(usersService.setLocalPasswordHash).not.toHaveBeenCalled();
+  });
+
+  it('sends the account deleted email without touching the (deleted) user', async () => {
+    await processor.process(
+      job(MailJob.ACCOUNT_DELETED, {
+        ...DATA,
+        accountType: 'moderator',
+      } as MailJobData),
+    );
+
+    expect(mailService.sendAccountDeletedEmail).toHaveBeenCalledWith(
+      'a@example.com',
+      'moderator',
+    );
+    expect(usersService.setLocalPasswordHash).not.toHaveBeenCalled();
   });
 });

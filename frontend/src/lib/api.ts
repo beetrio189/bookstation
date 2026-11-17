@@ -153,13 +153,21 @@ export async function api<T = Record<string, never>>(
     const isExpired =
       options.auth &&
       error instanceof ApiError &&
-      error.code === UNAUTHENTICATED_CODE &&
-      (await refreshSession());
+      error.code === UNAUTHENTICATED_CODE;
 
     if (!isExpired) {
       throw error;
     }
 
-    return request<T>(path, options);
+    if (await refreshSession()) {
+      return request<T>(path, options);
+    }
+
+    // Phiên đã hết hẳn (đăng xuất ở tab khác, bị xóa tài khoản...): về trang đăng nhập
+    if (window.location.pathname !== "/login") {
+      window.location.replace("/login");
+    }
+
+    throw error;
   }
 }

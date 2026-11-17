@@ -1,15 +1,27 @@
-import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 
-export function Logo({ className }: { className?: string }) {
+export function Logo({
+  className,
+  textClassName,
+  to = "/",
+}: {
+  className?: string;
+  // Đổi cỡ chữ "BookStation" (header trang chủ nhỏ hơn mặc định)
+  textClassName?: string;
+  to?: "/" | "/admin" | "/publisher";
+}) {
   return (
     <Link
-      href="/"
+      to={to}
+      // Không coi logo là "đang ở trang này" khi đang ở trang con (/admin/...)
+      activeOptions={{ exact: true }}
       className={cn("flex items-center gap-2.5 text-foreground", className)}
     >
-      <Image src="/icons/logo-bookmark.svg" alt="" width={40} height={40} />
-      <span className="text-[32px] leading-tight font-semibold">
+      <img src="/icons/logo-bookmark.svg" alt="" width={40} height={40} />
+      <span
+        className={cn("text-[32px] leading-tight font-semibold", textClassName)}
+      >
         BookStation
       </span>
     </Link>

@@ -3,11 +3,13 @@ import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import {
   AccountCredentialsJobData,
+  AccountDeletedJobData,
   AccountType,
   MAIL_QUEUE,
   MailJob,
   MailJobData,
   PasswordChangedJobData,
+  PublisherStatusJobData,
 } from './mail-queue.constants';
 
 @Injectable()
@@ -55,9 +57,32 @@ export class MailQueueService {
     userId: string,
     email: string,
     accountType: AccountType,
+    reason?: string,
   ): Promise<void> {
-    const data: AccountCredentialsJobData = { userId, email, accountType };
+    const data: AccountCredentialsJobData = {
+      userId,
+      email,
+      accountType,
+      ...(reason && { reason }),
+    };
 
     await this.queue.add(MailJob.ACCOUNT_PASSWORD_RESET, data);
+  }
+
+  async enqueuePublisherStatusEmail(
+    job: MailJob.PUBLISHER_SUSPENDED | MailJob.PUBLISHER_UNSUSPENDED,
+    data: PublisherStatusJobData,
+  ): Promise<void> {
+    await this.queue.add(job, data);
+  }
+
+  async enqueueAccountDeletedEmail(
+    userId: string,
+    email: string,
+    accountType: AccountType,
+  ): Promise<void> {
+    const data: AccountDeletedJobData = { userId, email, accountType };
+
+    await this.queue.add(MailJob.ACCOUNT_DELETED, data);
   }
 }

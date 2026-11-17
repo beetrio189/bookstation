@@ -7,7 +7,7 @@ export interface ErrorDefinition {
 }
 
 /**
- * 1xxx: lỗi chung, 2xxx: tài khoản. Module mới dùng dải tiếp theo.
+ * 1xxx: lỗi chung, 2xxx: tài khoản, 3xxx: quản trị. Module mới dùng dải tiếp theo.
  *
  * Quy ước với FE: phân loại lỗi theo `status`, không theo dải `code`.
  * - 429, 5xx (và khi không có response): lỗi hệ thống. FE hiện toast góc
@@ -110,5 +110,28 @@ export const ERRORS = {
     status: HttpStatus.CONFLICT,
     message:
       'Email này đã được xác minh. Nếu quên mật khẩu, hãy chuyển qua Quên mật khẩu',
+  },
+
+  PUBLISHER_ALREADY_SUSPENDED: {
+    code: 3000,
+    status: HttpStatus.CONFLICT,
+    message: 'Nhà xuất bản này đang bị đình chỉ',
+  },
+  PUBLISHER_NOT_SUSPENDED: {
+    code: 3001,
+    status: HttpStatus.CONFLICT,
+    message: 'Nhà xuất bản này không bị đình chỉ',
+  },
+  // Tài khoản đích (NXB, biên tập viên) đang bị khóa, khác ACCOUNT_LOCKED là chính người gọi bị khóa
+  TARGET_ACCOUNT_LOCKED: {
+    code: 3002,
+    status: HttpStatus.CONFLICT,
+    message: 'Tài khoản này đang bị khóa',
+  },
+  PASSWORD_RESET_LIMIT: {
+    code: 3003,
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    message:
+      'Đã quá số lần đặt lại mật khẩu trong ngày, vui lòng thử lại sau 24 tiếng',
   },
 } as const satisfies Record<string, ErrorDefinition>;

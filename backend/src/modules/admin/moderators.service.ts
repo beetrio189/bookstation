@@ -10,10 +10,10 @@ import { AppException } from '../../utils/errors/app.exception';
 import { ERRORS } from '../../utils/errors/errors';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { MailQueueService } from '../mail/mail-queue.service';
-import { SystemLog } from '../system-logs/entities/system-log.entity';
 import { Provider } from '../users/entities/provider.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateModeratorDto } from './dto/create-moderator.dto';
+import { writeSystemLog } from './write-system-log';
 
 export interface ModeratorView {
   id: string;
@@ -62,7 +62,7 @@ export class ModeratorsService {
    */
   async create(
     actorId: string,
-    { email, name }: CreateModeratorDto,
+    { email, name, note }: CreateModeratorDto,
   ): Promise<ModeratorView> {
     let user: User;
 
@@ -94,10 +94,11 @@ export class ModeratorsService {
           passwordHash: null,
         });
 
-        await this.writeLog(manager, actorId, {
+        await writeSystemLog(manager, actorId, {
           actionType: SystemActionType.MODERATOR_CREATION,
           targetId: created.id,
           targetName: created.name,
+          note,
         });
 
         return created;
@@ -164,10 +165,15 @@ export class ModeratorsService {
     return account;
   }
 
-  async remove(actorId: string, id: string): Promise<Record<string, never>> {
-    await this.usersRepository.manager.transaction(async (manager) => {
+  async remove(
+    actorId: string,
+    id: string,
+    note: string,
+  ): Promise<Record<string, never>> {
+    const moderator = await this.usersRepository.manager.transaction(
+      async (manager) => {
       const moderator = await manager.findOne(User, {
-        select: { id: true, name: true },
+        select: { id: true, name: true, notificationEmail: true },
         where: { id, role: RoleCode.MODERATOR },
         lock: { mode: 'pessimistic_write' },
       });
@@ -178,12 +184,27 @@ export class ModeratorsService {
 
       await manager.delete(User, { id });
 
-      await this.writeLog(manager, actorId, {
+      await writeSystemLog(manager, actorId, {
         actionType: SystemActionType.MODERATOR_DELETION,
         targetId: id,
         targetName: moderator.name,
+        note,
       });
-    });
+
+      return moderator;
+      },
+    );
+
+    // Đã xóa xong: không đẩy được mail thì chỉ ghi log, không báo lỗi cho admin
+    try {
+      await this.mailQueueService.enqueueAccountDeletedEmail(
+        id,
+        moderator.notificationEmail,
+        'moderator',
+      );
+    } catch (error) {
+      this.logger.error(error);
+    }
 
     return {};
   }
@@ -195,6 +216,7 @@ export class ModeratorsService {
   async resetPassword(
     actorId: string,
     id: string,
+    note: string,
   ): Promise<Record<string, never>> {
     const email = await this.usersRepository.manager.transaction(
       async (manager) => {
@@ -216,10 +238,11 @@ export class ModeratorsService {
         );
         await manager.delete(RefreshToken, { userId: id });
 
-        await this.writeLog(manager, actorId, {
+        await writeSystemLog(manager, actorId, {
           actionType: SystemActionType.MODERATOR_PASSWORD_RESET,
           targetId: id,
           targetName: moderator.name,
+          note,
         });
 
         return moderator.email;
@@ -270,23 +293,6 @@ export class ModeratorsService {
     }
 
     return query.getRawOne<ModeratorDetail>();
-  }
-
-  private async writeLog(
-    manager: EntityManager,
-    actorId: string,
-    entry: Pick<SystemLog, 'actionType' | 'targetId' | 'targetName'>,
-  ): Promise<void> {
-    const actor = await manager.findOneOrFail(User, {
-      select: { name: true },
-      where: { id: actorId },
-    });
-
-    await manager.insert(SystemLog, {
-      actorId,
-      actorName: actor.name,
-      ...entry,
-    });
   }
 
   private async enqueueCredentialsEmail(

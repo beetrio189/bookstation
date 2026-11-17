@@ -245,8 +245,12 @@ export class AuthService {
     };
   }
 
-  private signAccessToken(user: User): Promise<string> {
-    const payload: JwtPayload = { sub: user.id, role: user.role };
+  private async signAccessToken(user: User): Promise<string> {
+    const payload: JwtPayload = {
+      sub: user.id,
+      role: user.role,
+      providers: await this.usersService.findProviderTypes(user.id),
+    };
 
     return this.jwtService.signAsync(payload);
   }

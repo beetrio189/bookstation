@@ -12,6 +12,7 @@ import { IdParam } from '../../decorators/id-param.decorator';
 import { Roles } from '../../decorators/roles.decorator';
 import { RoleCode } from '../../utils/enums/role-code.enum';
 import type { AuthUser } from '../../utils/types/auth-user';
+import { ActionNoteDto } from './dto/action-note.dto';
 import { CreateModeratorDto } from './dto/create-moderator.dto';
 import { ModeratorsService } from './moderators.service';
 
@@ -39,14 +40,22 @@ export class ModeratorsController {
 
   @Roles(RoleCode.ADMIN)
   @Delete(':id')
-  remove(@CurrentUser() user: AuthUser, @IdParam() id: string) {
-    return this.moderatorsService.remove(user.id, id);
+  remove(
+    @CurrentUser() user: AuthUser,
+    @IdParam() id: string,
+    @Body() { note }: ActionNoteDto,
+  ) {
+    return this.moderatorsService.remove(user.id, id, note);
   }
 
   @Roles(RoleCode.ADMIN)
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
-  resetPassword(@CurrentUser() user: AuthUser, @IdParam() id: string) {
-    return this.moderatorsService.resetPassword(user.id, id);
+  resetPassword(
+    @CurrentUser() user: AuthUser,
+    @IdParam() id: string,
+    @Body() { note }: ActionNoteDto,
+  ) {
+    return this.moderatorsService.resetPassword(user.id, id, note);
   }
 }

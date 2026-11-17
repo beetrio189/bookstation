@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 
 // Khớp ERRORS.EMAIL_ALREADY_VERIFIED của backend
 const EMAIL_ALREADY_VERIFIED = 2010;
@@ -13,7 +13,7 @@ export function ApiErrorText({ code, text }: { code: number; text: string }) {
       <>
         Email này đã được xác minh. Nếu quên mật khẩu, hãy chuyển qua{" "}
         <Link
-          href="/forgot-password"
+          to="/forgot-password"
           className="font-bold text-primary underline"
         >
           Quên mật khẩu

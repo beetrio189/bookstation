@@ -57,9 +57,12 @@ CREATE TYPE "system_action_type" AS ENUM (
   'publisher_update',
   'publisher_deletion',
   'publisher_suspended',
+  'publisher_unsuspended',
+  'publisher_password_reset',
   'editor_creation',
   'editor_update',
   'editor_deletion',
+  'editor_password_reset',
   'reader_lock',
   'reader_unlock',
   'book_creation',
@@ -131,6 +134,7 @@ CREATE TABLE "books" (
   "title" varchar(500) NOT NULL,
   "slug" varchar(255) UNIQUE NOT NULL,
   "description" text,
+  "cover_url" text,
   "contributors" jsonb NOT NULL,
   "published_year" smallint,
   "rating_avg" numeric(3,2),
@@ -207,6 +211,7 @@ CREATE TABLE "system_logs" (
   "action_type" system_action_type NOT NULL,
   "target_id" uuid NOT NULL,
   "target_name" text NOT NULL,
+  "note" text NOT NULL DEFAULT '',
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
@@ -377,23 +382,23 @@ ALTER TABLE "refresh_tokens" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id
 
 ALTER TABLE "providers" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "publishers" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "publishers" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "editors" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "editors" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "editors" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "editors" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "books" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "books" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "book_genres" ADD FOREIGN KEY ("book_id") REFERENCES "books" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "book_genres" ADD FOREIGN KEY ("book_id") REFERENCES "books" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "book_genres" ADD FOREIGN KEY ("genre_id") REFERENCES "genres" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "book_reviews" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "book_reviews" ADD FOREIGN KEY ("book_id") REFERENCES "books" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "book_reviews" ADD FOREIGN KEY ("book_id") REFERENCES "books" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "surveys" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "surveys" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "survey_answers" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
@@ -401,4 +406,4 @@ ALTER TABLE "survey_answers" ADD FOREIGN KEY ("survey_id") REFERENCES "surveys" 
 
 ALTER TABLE "violation_reports" ADD FOREIGN KEY ("reporter_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "subscription_logs" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "subscription_logs" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;

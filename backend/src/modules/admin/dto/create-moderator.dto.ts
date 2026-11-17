@@ -1,9 +1,10 @@
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { IsNormalizedEmail } from '../../../decorators/is-normalized-email.decorator';
+import { ActionNoteDto } from './action-note.dto';
 
 // Admin không nhập mật khẩu: worker tự sinh rồi gửi qua email
-export class CreateModeratorDto {
+export class CreateModeratorDto extends ActionNoteDto {
   @IsNormalizedEmail()
   email: string;
 

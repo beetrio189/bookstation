@@ -1,7 +1,4 @@
-"use client";
-
 import { Eye } from "lucide-react";
-import Image from "next/image";
 import { useState, type ComponentProps } from "react";
 import { OutlinedInput } from "@/components/outlined-input";
 
@@ -29,7 +26,7 @@ export function PasswordInput(props: PasswordInputProps) {
           {visible ? (
             <Eye className="size-7.5" strokeWidth={1.5} />
           ) : (
-            <Image src="/icons/eye-hide.svg" alt="" width={30} height={30} />
+            <img src="/icons/eye-hide.svg" alt="" width={30} height={30} />
           )}
         </button>
       }

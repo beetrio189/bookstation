@@ -8,6 +8,7 @@ import { Public } from '../../src/decorators/public.decorator';
 import { Roles } from '../../src/decorators/roles.decorator';
 import { AllExceptionsFilter } from '../../src/filters/all-exceptions.filter';
 import { ResponseInterceptor } from '../../src/interceptors/response.interceptor';
+import { IdentityProvider } from '../../src/utils/enums/identity-provider.enum';
 import { RoleCode } from '../../src/utils/enums/role-code.enum';
 import { AuthUser } from '../../src/utils/types/auth-user';
 import { JwtPayload } from '../../src/utils/types/jwt-payload';
@@ -56,6 +57,7 @@ class StaffController {
 const payloadFor = (id: string, role: RoleCode): JwtPayload => ({
   sub: id,
   role,
+  providers: [IdentityProvider.LOCAL],
 });
 
 const READER = payloadFor('reader', RoleCode.READER);
