@@ -6,7 +6,8 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-export const FREE_PLAN_NAME = 'none';
+// Gói Free là dòng duy nhất có duration 'infinity': nhận diện bằng duration, không bằng tên (admin đổi tên được)
+export const FREE_PLAN_DURATION = 'infinity';
 
 @Entity('plans')
 export class Plan {

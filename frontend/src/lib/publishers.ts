@@ -2,8 +2,6 @@
 
 export type AccountStatus = "active" | "locked";
 
-export type SubscriptionTier = "none" | "basic" | "advanced" | "pro";
-
 export interface PublisherListItem {
   id: string;
   publisherName: string;
@@ -24,7 +22,8 @@ export interface PublisherDetail extends PublisherListItem {
   email: string;
   logoUrl?: string;
   description?: string;
-  subscriptionTier?: SubscriptionTier;
+  // Tên gói hiện tại (plans.name, cũng là tên hiển thị): "Free", "basic"…
+  subscriptionTier?: string;
   bookCount: number;
   editorCount: number;
   createdAt: string;
@@ -48,13 +47,6 @@ export interface EditorDetail extends PublisherEditorItem {
   bio?: string;
   updatedAt: string;
 }
-
-export const TIER_LABELS: Record<SubscriptionTier, string> = {
-  none: "Chưa đăng ký",
-  basic: "Cơ bản",
-  advanced: "Nâng cao",
-  pro: "Pro",
-};
 
 // Mã lỗi backend (backend/src/utils/errors/errors.ts)
 export const ERROR_CODES = {

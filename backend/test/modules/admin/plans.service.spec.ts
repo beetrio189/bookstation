@@ -27,21 +27,28 @@ describe('PlansService', () => {
   manager.transaction.mockImplementation(
     (work: (m: typeof manager) => unknown) => work(manager),
   );
-  const service = new PlansService({ manager } as unknown as Repository<Plan>);
+  // Query builder giả: mọi hàm nối chuỗi trả lại chính nó
+  const queryBuilder = { getRawMany: jest.fn() } as Record<string, jest.Mock>;
+  for (const method of ['select', 'addSelect', 'orderBy', 'addOrderBy']) {
+    queryBuilder[method] = jest.fn(() => queryBuilder);
+  }
+  const service = new PlansService({
+    manager,
+    createQueryBuilder: jest.fn(() => queryBuilder),
+  } as unknown as Repository<Plan>);
 
-  // Lần 1: advisory lock, lần 2: INSERT ... RETURNING
+  // INSERT ... RETURNING
   const mockInsert = () =>
-    manager.query
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: 'plan-1', createdAt: CREATED_AT }]);
+    manager.query.mockResolvedValueOnce([
+      { id: 'plan-1', createdAt: CREATED_AT },
+    ]);
 
   beforeEach(() => {
     jest.clearAllMocks();
-    manager.findOne.mockResolvedValue(null);
     manager.findOneOrFail.mockResolvedValue({ name: 'Quản trị viên' });
   });
 
-  it('locks on the name, inserts with make_interval, logs, and returns the plan', async () => {
+  it('inserts with make_interval, logs, and returns the plan', async () => {
     mockInsert();
 
     await expect(service.create(ADMIN_ID, DTO)).resolves.toEqual({
@@ -55,13 +62,9 @@ describe('PlansService', () => {
       createdAt: CREATED_AT,
     });
 
-    expect(manager.query).toHaveBeenNthCalledWith(
-      1,
-      expect.stringContaining('pg_advisory_xact_lock'),
-      ['basic'],
-    );
-    expect(manager.query).toHaveBeenNthCalledWith(
-      2,
+    // Chỉ một câu INSERT: không còn khóa / so hạn mức theo tên
+    expect(manager.query).toHaveBeenCalledTimes(1);
+    expect(manager.query).toHaveBeenCalledWith(
       expect.stringContaining('make_interval(months => $2)'),
       ['basic', 6, 'Cho NXB nhỏ', 500000, 100000, 2],
     );
@@ -81,7 +84,7 @@ describe('PlansService', () => {
     await expect(
       service.create(ADMIN_ID, { ...DTO, description: '' }),
     ).resolves.toMatchObject({ description: null });
-    expect(manager.query).toHaveBeenNthCalledWith(2, expect.any(String), [
+    expect(manager.query).toHaveBeenCalledWith(expect.any(String), [
       'basic',
       6,
       null,
@@ -91,34 +94,8 @@ describe('PlansService', () => {
     ]);
   });
 
-  it('accepts another duration of a name when the limits match', async () => {
-    mockInsert();
-    manager.findOne.mockResolvedValue({ bookLimit: 100000, editorLimit: 2 });
-
-    await expect(service.create(ADMIN_ID, DTO)).resolves.toMatchObject({
-      id: 'plan-1',
-    });
-  });
-
-  it.each([
-    ['book', { bookLimit: 200000, editorLimit: 2 }],
-    ['editor', { bookLimit: 100000, editorLimit: 5 }],
-  ])(
-    'refuses a %s limit that differs from the plan with the same name',
-    async (_label, existing) => {
-      manager.query.mockResolvedValueOnce([]);
-      manager.findOne.mockResolvedValue(existing);
-
-      await expect(service.create(ADMIN_ID, DTO)).rejects.toMatchObject({
-        code: 3005,
-      });
-      expect(manager.query).toHaveBeenCalledTimes(1);
-      expect(manager.insert).not.toHaveBeenCalled();
-    },
-  );
-
   it('maps a duplicate (name, duration) to PLAN_ALREADY_EXISTS', async () => {
-    manager.query.mockResolvedValueOnce([]).mockRejectedValueOnce(
+    manager.query.mockRejectedValueOnce(
       new QueryFailedError('INSERT', [], {
         code: '23505',
       } as unknown as Error),
@@ -134,5 +111,25 @@ describe('PlansService', () => {
     manager.query.mockRejectedValueOnce(failure);
 
     await expect(service.create(ADMIN_ID, DTO)).rejects.toBe(failure);
+  });
+
+  describe('list', () => {
+    it('returns every plan ordered by duration then price, Free without months', async () => {
+      const rows = [
+        { id: 'plan-1', name: 'basic', durationMonths: 6, isActive: false },
+        { id: 'plan-free', name: 'Free', durationMonths: null, isActive: true },
+      ];
+      queryBuilder.getRawMany.mockResolvedValue(rows);
+
+      await expect(service.list()).resolves.toEqual({ items: rows });
+
+      expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+        expect.stringContaining("WHEN plan.duration = 'infinity' THEN NULL"),
+        'durationMonths',
+      );
+      expect(queryBuilder.orderBy).toHaveBeenCalledWith('plan.duration', 'ASC');
+      expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('plan.price', 'ASC');
+      // Không lọc is_active: admin thấy cả gói đã ẩn (query builder giả không có where)
+    });
   });
 });

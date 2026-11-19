@@ -43,6 +43,12 @@ describe('CreatePlanDto', () => {
     ).resolves.toMatchObject({ ...rest, bookLimit: 0, editorLimit: 0 });
   });
 
+  it('accepts the same name as the Free plan (only name + duration must be unique)', async () => {
+    await expect(body({ ...VALID, name: ' FREE ' })).resolves.toMatchObject({
+      name: 'free',
+    });
+  });
+
   it.each([6, 12, 24])('accepts %i months', async (durationMonths) => {
     await expect(body({ ...VALID, durationMonths })).resolves.toMatchObject({
       durationMonths,
@@ -50,7 +56,6 @@ describe('CreatePlanDto', () => {
   });
 
   it.each([
-    ['the free plan name', { name: ' None ' }],
     ['a name with spaces', { name: 'gói cơ bản' }],
     ['a blank name', { name: '  ' }],
     ['a name over 50 characters', { name: 'a'.repeat(51) }],

@@ -20,6 +20,19 @@ export interface PlanCreated {
   createdAt: Date;
 }
 
+export interface PlanListItem {
+  id: string;
+  name: string;
+  durationMonths: number | null;
+  description: string | null;
+  price: number;
+  bookLimit: number;
+  editorLimit: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 @Injectable()
 export class PlansService {
   constructor(
@@ -28,9 +41,39 @@ export class PlansService {
   ) {}
 
   /**
-   * Thêm gói trả phí trong một transaction: khóa theo tên gói để 2 request cùng
-   * tên không chen nhau lúc so hạn mức, kiểm hạn mức khớp gói cùng tên, INSERT
-   * rồi ghi log. Trùng (name, duration), kể cả song song, do UNIQUE trong DB chặn.
+   * Mọi gói, kể cả gói Free và gói đã ẩn. Sắp theo thời hạn rồi giá: gói Free
+   * (duration 'infinity') tự xuống cuối. 'infinity' không đổi ra số tháng được
+   * (ép int báo lỗi) nên trả NULL.
+   */
+  async list(): Promise<{ items: PlanListItem[] }> {
+    const items = await this.plansRepository
+      .createQueryBuilder('plan')
+      .select('plan.id', 'id')
+      .addSelect('plan.name', 'name')
+      .addSelect('plan.description', 'description')
+      .addSelect('plan.price', 'price')
+      .addSelect(
+        `CASE WHEN plan.duration = 'infinity' THEN NULL
+              ELSE (EXTRACT(YEAR FROM plan.duration) * 12 + EXTRACT(MONTH FROM plan.duration))::int
+         END`,
+        'durationMonths',
+      )
+      .addSelect('plan.book_limit', 'bookLimit')
+      .addSelect('plan.editor_limit', 'editorLimit')
+      .addSelect('plan.is_active', 'isActive')
+      .addSelect('plan.created_at', 'createdAt')
+      .addSelect('plan.updated_at', 'updatedAt')
+      .orderBy('plan.duration', 'ASC')
+      .addOrderBy('plan.price', 'ASC')
+      .getRawMany<PlanListItem>();
+
+    return { items };
+  }
+
+  /**
+   * Thêm gói trả phí: INSERT + ghi log trong một transaction. Chỉ ràng buộc
+   * UNIQUE (name, duration) trong DB (kể cả request song song); tên và hạn mức
+   * giữa các gói cùng tên không cần khớp nhau.
    */
   async create(
     actorId: string,
@@ -48,24 +91,6 @@ export class PlansService {
 
     try {
       return await this.plansRepository.manager.transaction(async (manager) => {
-        await manager.query(
-          `SELECT pg_advisory_xact_lock(hashtext('plans:' || $1))`,
-          [name],
-        );
-
-        const sameName = await manager.findOne(Plan, {
-          select: { bookLimit: true, editorLimit: true },
-          where: { name },
-        });
-
-        if (
-          sameName &&
-          (sameName.bookLimit !== bookLimit ||
-            sameName.editorLimit !== editorLimit)
-        ) {
-          throw new AppException(ERRORS.PLAN_LIMITS_MISMATCH);
-        }
-
         const [row] = await manager.query<{ id: string; createdAt: Date }[]>(
           `INSERT INTO plans (name, duration, description, price, book_limit, editor_limit)
            VALUES ($1, make_interval(months => $2), $3, $4, $5, $6)

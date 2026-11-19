@@ -441,16 +441,17 @@ ALTER TABLE "payments" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" 
 
 ALTER TABLE "payments" ADD FOREIGN KEY ("plan_id") REFERENCES "plans" ("id") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
 
-/* Gói Free "none": migration Plans tạo sẵn (price 0, duration 'infinity', hạn mức 0); chặn đổi duration, price, is_active */
+/* Gói Free: migration tạo sẵn (price 0, duration 'infinity', hạn mức 0), là dòng duy nhất có duration infinity.
+   Nhận diện bằng duration vì admin đổi được tên (và mô tả, hạn mức); chặn đổi duration, price, is_active */
 
 CREATE FUNCTION "protect_free_plan"() RETURNS trigger AS $$
 BEGIN
-  IF OLD."name" = 'none' AND (
+  IF OLD."duration" = 'infinity' AND (
     NEW."duration" IS DISTINCT FROM OLD."duration"
     OR NEW."price" IS DISTINCT FROM OLD."price"
     OR NEW."is_active" IS DISTINCT FROM OLD."is_active"
   ) THEN
-    RAISE EXCEPTION 'Không được đổi duration, price, is_active của gói none';
+    RAISE EXCEPTION 'Không được đổi duration, price, is_active của gói Free';
   END IF;
   RETURN NEW;
 END;
@@ -460,9 +461,9 @@ CREATE TRIGGER "plans_protect_free_plan"
 BEFORE UPDATE ON "plans"
 FOR EACH ROW EXECUTE FUNCTION "protect_free_plan"();
 
-COMMENT ON TABLE "plans" IS 'Gói hội viên NXB. duration là interval (6 months, 1 year…); gói Free "none" có duration = infinity, migration tạo sẵn.';
+COMMENT ON TABLE "plans" IS 'Gói hội viên NXB. duration là interval (6 months, 1 year…); gói "Free" có duration = infinity, migration tạo sẵn.';
 
-COMMENT ON TABLE "payments" IS 'Lịch sử mua gói. Gói hiện tại của NXB = dòng success có period_ends_at > now(); không có thì là gói Free "none".';
+COMMENT ON TABLE "payments" IS 'Lịch sử mua gói. Gói hiện tại của NXB = dòng success có period_ends_at > now(); không có thì là gói "Free".';
 
 COMMENT ON COLUMN "payments"."price" IS 'Giá lúc mua, đổi plans.price sau này không ảnh hưởng lịch sử.';
 

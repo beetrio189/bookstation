@@ -1,4 +1,10 @@
-import { ArrowLeft, KeyRound, LockKeyhole, LockKeyholeOpen, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  KeyRound,
+  LockKeyhole,
+  LockKeyholeOpen,
+  Trash2,
+} from "lucide-react";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -10,7 +16,7 @@ import { actionButton } from "@/components/app-dialog";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/moderators";
-import { TIER_LABELS, type PublisherDetail as Detail } from "@/lib/publishers";
+import { type PublisherDetail as Detail } from "@/lib/publishers";
 import { getRole } from "@/lib/session";
 
 const route = getRouteApi("/admin/publishers/$id/");
@@ -134,7 +140,7 @@ export function PublisherDetail() {
             <PasswordBadge hasPassword={detail.hasPassword} />
           </InfoRow>
           <InfoRow label="Gói dịch vụ">
-            {TIER_LABELS[detail.subscriptionTier ?? "none"]}
+            {detail.subscriptionTier ?? "Free"}
           </InfoRow>
           <InfoRow label="Số sách">{detail.bookCount}</InfoRow>
           <InfoRow label="Biên tập viên">

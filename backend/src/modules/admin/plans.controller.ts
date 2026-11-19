@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Header, Post } from '@nestjs/common';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import { Roles } from '../../decorators/roles.decorator';
 import { RoleCode } from '../../utils/enums/role-code.enum';
@@ -14,5 +14,11 @@ export class PlansController {
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreatePlanDto) {
     return this.plansService.create(user.id, dto);
+  }
+
+  @Get()
+  @Header('Cache-Control', 'no-store')
+  list() {
+    return this.plansService.list();
   }
 }

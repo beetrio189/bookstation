@@ -7,6 +7,7 @@ import { MailJob } from '../../../src/modules/mail/mail-queue.constants';
 import { MailQueueService } from '../../../src/modules/mail/mail-queue.service';
 import { Publisher } from '../../../src/modules/publishers/entities/publisher.entity';
 import { SystemLog } from '../../../src/modules/system-logs/entities/system-log.entity';
+import { Plan } from '../../../src/modules/subscriptions/entities/plan.entity';
 import { Provider } from '../../../src/modules/users/entities/provider.entity';
 import { User } from '../../../src/modules/users/entities/user.entity';
 import { IdentityProvider } from '../../../src/utils/enums/identity-provider.enum';
@@ -89,7 +90,10 @@ describe('PublishersService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     manager.existsBy.mockResolvedValue(false);
-    manager.findOneOrFail.mockResolvedValue({ name: 'Quản trị viên' });
+    // Người làm (ghi log) và gói Free (NXB mới) đều đọc bằng findOneOrFail
+    manager.findOneOrFail.mockImplementation((entity: unknown) =>
+      Promise.resolve({ name: entity === Plan ? 'Free' : 'Quản trị viên' }),
+    );
     manager.create.mockImplementation((_entity, data: object) => data);
     manager.save.mockImplementation((data: { role?: RoleCode }) =>
       data.role
@@ -115,7 +119,7 @@ describe('PublishersService', () => {
         email: DTO.email,
         publisherName: DTO.publisherName,
         slug: 'nha-xuat-ban-kim-dong',
-        subscriptionTier: 'none',
+        subscriptionTier: 'Free',
         createdAt: CREATED_AT,
       });
 

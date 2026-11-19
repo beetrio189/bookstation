@@ -140,10 +140,4 @@ export const ERRORS = {
     status: HttpStatus.CONFLICT,
     message: 'Gói này với thời hạn này đã tồn tại',
   },
-  // Tên gói đã có (thời hạn khác) nhưng số sách / biên tập viên tối đa khác gói cũ
-  PLAN_LIMITS_MISMATCH: {
-    code: 3005,
-    status: HttpStatus.CONFLICT,
-    message: 'Gói này đã tồn tại với hạn mức khác. Kiểm tra lại',
-  },
 } as const satisfies Record<string, ErrorDefinition>;

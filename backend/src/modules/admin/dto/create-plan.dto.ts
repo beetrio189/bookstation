@@ -3,7 +3,6 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
-  IsNotIn,
   IsOptional,
   IsString,
   Matches,
@@ -11,7 +10,6 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { FREE_PLAN_NAME } from '../../subscriptions/entities/plan.entity';
 import { ActionNoteDto } from './action-note.dto';
 
 const MAX_INT = 2_000_000_000;
@@ -20,14 +18,13 @@ const MAX_INT = 2_000_000_000;
 export const PLAN_DURATION_MONTHS = [6, 12, 24];
 
 /**
- * Admin thêm gói trả phí. Tên gói cũng là tên hiển thị; gói Free "none" có sẵn
- * nên không tạo được. Số phải gửi dạng number trong JSON, chuỗi "6" bị từ chối.
+ * Admin thêm gói trả phí. Tên gói cũng là tên hiển thị, trùng tên gói khác (kể cả
+ * Free) được miễn khác thời hạn. Số phải gửi dạng number trong JSON, chuỗi "6" bị từ chối.
  */
 export class CreatePlanDto extends ActionNoteDto {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
-  @IsNotIn([FREE_PLAN_NAME], { message: 'Không được tạo gói "none"' })
   @Matches(/^[a-z0-9-]+$/, {
     message: 'Tên gói chỉ gồm chữ thường không dấu, chữ số và dấu gạch ngang',
   })
