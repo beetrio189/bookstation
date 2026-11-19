@@ -26,11 +26,10 @@ CREATE TYPE "identity_provider" AS ENUM (
   'google'
 );
 
-CREATE TYPE "subscription_status" AS ENUM (
-  'none',
-  'basic',
-  'advanced',
-  'pro'
+CREATE TYPE "payment_status" AS ENUM (
+  'pending',
+  'success',
+  'failed'
 );
 
 CREATE TYPE "survey_status" AS ENUM (
@@ -69,7 +68,8 @@ CREATE TYPE "system_action_type" AS ENUM (
   'book_update',
   'book_deletion',
   'book_review',
-  'review_deletion'
+  'review_deletion',
+  'plan_creation'
 );
 
 /* Bảng */
@@ -110,7 +110,6 @@ CREATE TABLE "providers" (
 CREATE TABLE "publishers" (
   "id" uuid PRIMARY KEY DEFAULT (uuidv7()),
   "user_id" uuid UNIQUE NOT NULL,
-  "subscription_tier" subscription_status,
   "publisher_name" varchar(255) NOT NULL,
   "slug" varchar(255) UNIQUE NOT NULL,
   "logo_url" text,
@@ -216,18 +215,50 @@ CREATE TABLE "system_logs" (
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
 
-CREATE TABLE "subscription_logs" (
+CREATE TABLE "plans" (
   "id" uuid PRIMARY KEY DEFAULT (uuidv7()),
-  "publisher_id" uuid NOT NULL,
-  "subscription_tier" subscription_status NOT NULL,
-  "expires_at" timestamptz NOT NULL,
+  "name" varchar(50) NOT NULL,
+  "duration" interval NOT NULL,
+  "description" text,
+  "price" integer NOT NULL CHECK ("price" >= 0),
+  "book_limit" integer NOT NULL CHECK ("book_limit" >= 0),
+  "editor_limit" integer NOT NULL CHECK ("editor_limit" >= 0),
+  "is_active" bool NOT NULL DEFAULT true,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
-  "updated_at" timestamptz NOT NULL DEFAULT (now())
+  "updated_at" timestamptz NOT NULL DEFAULT (now()),
+  UNIQUE ("name", "duration"),
+  CHECK ("duration" > interval '0')
+);
+
+CREATE TABLE "payments" (
+  "id" uuid PRIMARY KEY DEFAULT (uuidv7()),
+  "publisher_id" uuid,
+  "plan_id" uuid,
+  "publisher_name" varchar(255) NOT NULL,
+  "plan_name" varchar(50) NOT NULL,
+  "duration" interval NOT NULL CHECK ("duration" > interval '0'),
+  "book_limit" integer NOT NULL CHECK ("book_limit" >= 0),
+  "editor_limit" integer NOT NULL CHECK ("editor_limit" >= 0),
+  "price" integer NOT NULL CHECK ("price" >= 0),
+  "vnp_txn_ref" varchar(100) UNIQUE NOT NULL,
+  "vnp_create_date" char(14),
+  "vnp_transaction_no" varchar(50),
+  "status" payment_status NOT NULL DEFAULT 'pending',
+  "period_starts_at" timestamptz,
+  "period_ends_at" timestamptz,
+  "created_at" timestamptz NOT NULL DEFAULT (now()),
+  "updated_at" timestamptz NOT NULL DEFAULT (now()),
+  CONSTRAINT "payments_period_check" CHECK ("period_ends_at" > "period_starts_at"),
+  CONSTRAINT "payments_success_period_check" CHECK ("status" <> 'success' OR ("period_starts_at" IS NOT NULL AND "period_ends_at" IS NOT NULL))
 );
 
 CREATE UNIQUE INDEX ON "refresh_tokens" ("token_hash");
 
 CREATE INDEX ON "refresh_tokens" ("user_id");
+
+CREATE INDEX ON "payments" ("publisher_id", "created_at");
+
+CREATE INDEX ON "payments" ("publisher_id", "status", "period_ends_at");
 
 CREATE UNIQUE INDEX ON "providers" ("provider", "provider_key");
 
@@ -406,4 +437,35 @@ ALTER TABLE "survey_answers" ADD FOREIGN KEY ("survey_id") REFERENCES "surveys" 
 
 ALTER TABLE "violation_reports" ADD FOREIGN KEY ("reporter_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE "subscription_logs" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "payments" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" ("id") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "payments" ADD FOREIGN KEY ("plan_id") REFERENCES "plans" ("id") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
+
+/* Gói Free "none": migration Plans tạo sẵn (price 0, duration 'infinity', hạn mức 0); chặn đổi duration, price, is_active */
+
+CREATE FUNCTION "protect_free_plan"() RETURNS trigger AS $$
+BEGIN
+  IF OLD."name" = 'none' AND (
+    NEW."duration" IS DISTINCT FROM OLD."duration"
+    OR NEW."price" IS DISTINCT FROM OLD."price"
+    OR NEW."is_active" IS DISTINCT FROM OLD."is_active"
+  ) THEN
+    RAISE EXCEPTION 'Không được đổi duration, price, is_active của gói none';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "plans_protect_free_plan"
+BEFORE UPDATE ON "plans"
+FOR EACH ROW EXECUTE FUNCTION "protect_free_plan"();
+
+COMMENT ON TABLE "plans" IS 'Gói hội viên NXB. duration là interval (6 months, 1 year…); gói Free "none" có duration = infinity, migration tạo sẵn.';
+
+COMMENT ON TABLE "payments" IS 'Lịch sử mua gói. Gói hiện tại của NXB = dòng success có period_ends_at > now(); không có thì là gói Free "none".';
+
+COMMENT ON COLUMN "payments"."price" IS 'Giá lúc mua, đổi plans.price sau này không ảnh hưởng lịch sử.';
+
+COMMENT ON COLUMN "payments"."publisher_name" IS 'Snapshot lúc mua: NXB hoặc gói bị xóa (publisher_id / plan_id thành NULL) thì lịch sử vẫn đọc được.';
+
+COMMENT ON COLUMN "payments"."vnp_transaction_no" IS 'Mã giao dịch VNPAY, điền khi nhận IPN.';

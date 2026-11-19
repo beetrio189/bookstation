@@ -172,30 +172,29 @@ export class ModeratorsService {
   ): Promise<Record<string, never>> {
     const moderator = await this.usersRepository.manager.transaction(
       async (manager) => {
-      const moderator = await manager.findOne(User, {
-        select: { id: true, name: true, notificationEmail: true },
-        where: { id, role: RoleCode.MODERATOR },
-        lock: { mode: 'pessimistic_write' },
-      });
+        const moderator = await manager.findOne(User, {
+          select: { id: true, name: true, notificationEmail: true },
+          where: { id, role: RoleCode.MODERATOR },
+          lock: { mode: 'pessimistic_write' },
+        });
 
-      if (!moderator) {
-        throw new AppException(ERRORS.NOT_FOUND);
-      }
+        if (!moderator) {
+          throw new AppException(ERRORS.NOT_FOUND);
+        }
 
-      await manager.delete(User, { id });
+        await manager.delete(User, { id });
 
-      await writeSystemLog(manager, actorId, {
-        actionType: SystemActionType.MODERATOR_DELETION,
-        targetId: id,
-        targetName: moderator.name,
-        note,
-      });
+        await writeSystemLog(manager, actorId, {
+          actionType: SystemActionType.MODERATOR_DELETION,
+          targetId: id,
+          targetName: moderator.name,
+          note,
+        });
 
-      return moderator;
+        return moderator;
       },
     );
 
-    // Đã xóa xong: không đẩy được mail thì chỉ ghi log, không báo lỗi cho admin
     try {
       await this.mailQueueService.enqueueAccountDeletedEmail(
         id,

@@ -1,4 +1,4 @@
-// Khớp enum "system_action_type" trong DB (migration AccountActionTypes, ModeratorPasswordReset, PublisherAdminActions)
+// Khớp enum "system_action_type" trong DB (migration AccountActionTypes, ModeratorPasswordReset, PublisherAdminActions, PlanCreationAction)
 export enum SystemActionType {
   MODERATOR_CREATION = 'moderator_creation',
   MODERATOR_DELETION = 'moderator_deletion',
@@ -20,4 +20,5 @@ export enum SystemActionType {
   BOOK_DELETION = 'book_deletion',
   BOOK_REVIEW = 'book_review',
   REVIEW_DELETION = 'review_deletion',
+  PLAN_CREATION = 'plan_creation',
 }

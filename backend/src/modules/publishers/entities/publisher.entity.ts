@@ -5,7 +5,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { SubscriptionTier } from '../../../utils/enums/subscription-tier.enum';
 
 @Entity('publishers')
 export class Publisher {
@@ -14,15 +13,6 @@ export class Publisher {
 
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
-
-  @Column({
-    name: 'subscription_tier',
-    type: 'enum',
-    enum: SubscriptionTier,
-    enumName: 'subscription_status',
-    nullable: true,
-  })
-  subscriptionTier: SubscriptionTier | null;
 
   // Tên hiển thị của NXB ở mọi nơi (không dùng users.name)
   @Column({ name: 'publisher_name', type: 'varchar', length: 255 })

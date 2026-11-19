@@ -134,4 +134,16 @@ export const ERRORS = {
     message:
       'Đã quá số lần đặt lại mật khẩu trong ngày, vui lòng thử lại sau 24 tiếng',
   },
+  // Trùng cặp (tên gói, thời hạn)
+  PLAN_ALREADY_EXISTS: {
+    code: 3004,
+    status: HttpStatus.CONFLICT,
+    message: 'Gói này với thời hạn này đã tồn tại',
+  },
+  // Tên gói đã có (thời hạn khác) nhưng số sách / biên tập viên tối đa khác gói cũ
+  PLAN_LIMITS_MISMATCH: {
+    code: 3005,
+    status: HttpStatus.CONFLICT,
+    message: 'Gói này đã tồn tại với hạn mức khác. Kiểm tra lại',
+  },
 } as const satisfies Record<string, ErrorDefinition>;

@@ -15,7 +15,6 @@ import type { AuthUser } from '../../utils/types/auth-user';
 import { RequiredNoteDto } from './dto/required-note.dto';
 import { EditorsService } from './editors.service';
 
-// Danh sách biên tập viên của một NXB: GET /admin/publishers/:id/editors. :id ở đây là editors.id
 @Roles(RoleCode.ADMIN, RoleCode.MODERATOR)
 @Controller('admin/editors')
 export class EditorsController {

@@ -11,7 +11,6 @@ import { Provider } from '../../../src/modules/users/entities/provider.entity';
 import { User } from '../../../src/modules/users/entities/user.entity';
 import { IdentityProvider } from '../../../src/utils/enums/identity-provider.enum';
 import { RoleCode } from '../../../src/utils/enums/role-code.enum';
-import { SubscriptionTier } from '../../../src/utils/enums/subscription-tier.enum';
 import { SystemActionType } from '../../../src/utils/enums/system-action-type.enum';
 import { UserStatus } from '../../../src/utils/enums/user-status.enum';
 
@@ -116,7 +115,7 @@ describe('PublishersService', () => {
         email: DTO.email,
         publisherName: DTO.publisherName,
         slug: 'nha-xuat-ban-kim-dong',
-        subscriptionTier: SubscriptionTier.NONE,
+        subscriptionTier: 'none',
         createdAt: CREATED_AT,
       });
 
@@ -137,7 +136,6 @@ describe('PublishersService', () => {
         userId: 'user-1',
         publisherName: DTO.publisherName,
         slug: 'nha-xuat-ban-kim-dong',
-        subscriptionTier: SubscriptionTier.NONE,
       });
       expect(manager.insert).toHaveBeenCalledWith(SystemLog, {
         actorId: ACTOR_ID,
@@ -384,14 +382,15 @@ describe('PublishersService', () => {
         userId: In(accounts),
       });
       expect(manager.query).not.toHaveBeenCalled();
-      expect(
-        mailQueueService.enqueuePublisherStatusEmail,
-      ).toHaveBeenCalledWith(MailJob.PUBLISHER_SUSPENDED, {
-        userId: 'user-1',
-        email: 'nxb@example.com',
-        publisherName: 'Nhà xuất bản Kim Đồng',
-        reason: 'Bị chiếm tài khoản',
-      });
+      expect(mailQueueService.enqueuePublisherStatusEmail).toHaveBeenCalledWith(
+        MailJob.PUBLISHER_SUSPENDED,
+        {
+          userId: 'user-1',
+          email: 'nxb@example.com',
+          publisherName: 'Nhà xuất bản Kim Đồng',
+          reason: 'Bị chiếm tài khoản',
+        },
+      );
       expect(manager.insert).toHaveBeenCalledWith(
         SystemLog,
         expect.objectContaining({
@@ -439,14 +438,15 @@ describe('PublishersService', () => {
           note: 'Đã xác minh',
         }),
       );
-      expect(
-        mailQueueService.enqueuePublisherStatusEmail,
-      ).toHaveBeenCalledWith(MailJob.PUBLISHER_UNSUSPENDED, {
-        userId: 'user-1',
-        email: 'nxb@example.com',
-        publisherName: 'Nhà xuất bản Kim Đồng',
-        reason: 'Đã xác minh',
-      });
+      expect(mailQueueService.enqueuePublisherStatusEmail).toHaveBeenCalledWith(
+        MailJob.PUBLISHER_UNSUSPENDED,
+        {
+          userId: 'user-1',
+          email: 'nxb@example.com',
+          publisherName: 'Nhà xuất bản Kim Đồng',
+          reason: 'Đã xác minh',
+        },
+      );
     });
 
     it('still succeeds when the email job cannot be queued', async () => {

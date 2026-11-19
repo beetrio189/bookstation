@@ -8,7 +8,6 @@ import {
 } from '../../utils/database-errors';
 import { IdentityProvider } from '../../utils/enums/identity-provider.enum';
 import { RoleCode } from '../../utils/enums/role-code.enum';
-import { SubscriptionTier } from '../../utils/enums/subscription-tier.enum';
 import { SystemActionType } from '../../utils/enums/system-action-type.enum';
 import { UserStatus } from '../../utils/enums/user-status.enum';
 import { AppException } from '../../utils/errors/app.exception';
@@ -20,6 +19,7 @@ import { MailQueueService } from '../mail/mail-queue.service';
 import { Editor } from '../publishers/entities/editor.entity';
 import { Publisher } from '../publishers/entities/publisher.entity';
 import { REDIS_CLIENT } from '../redis/redis.module';
+import { FREE_PLAN_NAME } from '../subscriptions/entities/plan.entity';
 import { Provider } from '../users/entities/provider.entity';
 import { User } from '../users/entities/user.entity';
 import { CreatePublisherDto } from './dto/create-publisher.dto';
@@ -32,7 +32,8 @@ export interface PublisherCreated {
   email: string;
   publisherName: string;
   slug: string;
-  subscriptionTier: SubscriptionTier;
+  // Tên gói (plans.name), NXB mới luôn ở gói Free 'none'
+  subscriptionTier: string;
   createdAt: Date;
 }
 
@@ -58,7 +59,8 @@ export interface PublisherDetail {
   publisherName: string;
   logoUrl: string | null;
   description: string | null;
-  subscriptionTier: SubscriptionTier | null;
+  subscriptionTier: string;
+  planEndsAt: Date | null;
   status: UserStatus;
   hasPassword: boolean;
   bookCount: number;
@@ -88,6 +90,11 @@ const SLUG_FALLBACK = 'nha-xuat-ban';
 const SLUG_CONSTRAINT = 'publishers_slug_key';
 const USER_NAME_LENGTH = 100;
 const FUZZY_MIN_LENGTH = 3;
+
+const CURRENT_PAYMENT_SQL = `SELECT {col} FROM payments pm
+  WHERE pm.publisher_id = publisher.id AND pm.status = 'success'
+    AND pm.period_starts_at <= now() AND pm.period_ends_at > now()
+  ORDER BY pm.period_ends_at DESC LIMIT 1`;
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, '\\$&');
 
@@ -142,7 +149,7 @@ export class PublishersService {
       email,
       publisherName: publisher.publisherName,
       slug: publisher.slug,
-      subscriptionTier: SubscriptionTier.NONE,
+      subscriptionTier: FREE_PLAN_NAME,
       createdAt: publisher.createdAt,
     };
   }
@@ -210,7 +217,14 @@ export class PublishersService {
       .addSelect('publisher.publisher_name', 'publisherName')
       .addSelect('publisher.logo_url', 'logoUrl')
       .addSelect('publisher.description', 'description')
-      .addSelect('publisher.subscription_tier', 'subscriptionTier')
+      .addSelect(
+        `COALESCE((${CURRENT_PAYMENT_SQL.replace('{col}', 'pm.plan_name')}), '${FREE_PLAN_NAME}')`,
+        'subscriptionTier',
+      )
+      .addSelect(
+        `(${CURRENT_PAYMENT_SQL.replace('{col}', 'pm.period_ends_at')})`,
+        'planEndsAt',
+      )
       .addSelect('user.status', 'status')
       .addSelect('provider.password_hash IS NOT NULL', 'hasPassword')
       .addSelect(
@@ -472,7 +486,6 @@ export class PublishersService {
           base,
           taken.map(({ slug }) => slug),
         ),
-        subscriptionTier: SubscriptionTier.NONE,
       }),
     );
 
@@ -542,7 +555,6 @@ export class PublishersService {
     }
   }
 
-  // Đã khóa/mở xong rồi: không đẩy được mail thì chỉ ghi log, không báo lỗi cho người làm
   private async enqueueStatusEmail(
     job: MailJob.PUBLISHER_SUSPENDED | MailJob.PUBLISHER_UNSUSPENDED,
     { userId, email, publisherName }: LockedPublisher,
