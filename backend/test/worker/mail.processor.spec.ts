@@ -16,6 +16,7 @@ import {
   verifyPassword,
 } from '../../src/utils/password';
 import { MailProcessor } from '../../src/worker/mail.processor';
+import { PlanNoticeService } from '../../src/worker/plan-notice.service';
 
 // attemptsMade = số lần đã lỗi trước lần chạy này; cấu hình thật là 3 lần
 const job = (name: string, data: MailJobData, attemptsMade = 1) =>
@@ -38,15 +39,19 @@ describe('MailProcessor', () => {
     sendPublisherSuspendedEmail: jest.fn(),
     sendAccountDeletedEmail: jest.fn(),
     sendPublisherUnsuspendedEmail: jest.fn(),
+    sendPlanUpdatedEmail: jest.fn(),
+    sendPlanDeletedEmail: jest.fn(),
   };
   const usersService = {
     setLocalPasswordHash: jest.fn(),
     clearLocalPasswordHash: jest.fn(),
   };
+  const planNoticeService = { fanOutPlanUpdated: jest.fn() };
   const processor = new MailProcessor(
     oneTimeTokenService as unknown as OneTimeTokenService,
     mailService as unknown as MailService,
     usersService as unknown as UsersService,
+    planNoticeService as unknown as PlanNoticeService,
   );
   const DATA = { userId: 'user-1', email: 'a@example.com' };
 
@@ -260,18 +265,25 @@ describe('MailProcessor', () => {
   it.each([
     [MailJob.PUBLISHER_SUSPENDED, 'sendPublisherSuspendedEmail'],
     [MailJob.PUBLISHER_UNSUSPENDED, 'sendPublisherUnsuspendedEmail'],
-  ] as const)('sends the %s email with the name and reason, no password', async (name, method) => {
-    await processor.process(
-      job(name, { ...DATA, publisherName: 'Kim Đồng', reason: 'Lý do' } as MailJobData),
-    );
+  ] as const)(
+    'sends the %s email with the name and reason, no password',
+    async (name, method) => {
+      await processor.process(
+        job(name, {
+          ...DATA,
+          publisherName: 'Kim Đồng',
+          reason: 'Lý do',
+        } as MailJobData),
+      );
 
-    expect(mailService[method]).toHaveBeenCalledWith(
-      'a@example.com',
-      'Kim Đồng',
-      'Lý do',
-    );
-    expect(usersService.setLocalPasswordHash).not.toHaveBeenCalled();
-  });
+      expect(mailService[method]).toHaveBeenCalledWith(
+        'a@example.com',
+        'Kim Đồng',
+        'Lý do',
+      );
+      expect(usersService.setLocalPasswordHash).not.toHaveBeenCalled();
+    },
+  );
 
   it('sends the account deleted email without touching the (deleted) user', async () => {
     await processor.process(
@@ -286,5 +298,91 @@ describe('MailProcessor', () => {
       'moderator',
     );
     expect(usersService.setLocalPasswordHash).not.toHaveBeenCalled();
+  });
+
+  describe('plan notices', () => {
+    const PLAN = {
+      name: 'Basic Plus',
+      price: 600000,
+      bookLimit: 100000,
+      editorLimit: 2,
+    };
+
+    it('fans out a plan update by id only (the plan is read again from the database)', async () => {
+      await processor.process(
+        job(MailJob.PLAN_UPDATED, {
+          planId: 'plan-1',
+        } as unknown as MailJobData),
+      );
+
+      expect(planNoticeService.fanOutPlanUpdated).toHaveBeenCalledWith(
+        'plan-1',
+      );
+    });
+
+    it('emails a subscriber with the old plan name and the end of the period', async () => {
+      await processor.process(
+        job(MailJob.PLAN_UPDATED_NOTICE, {
+          ...DATA,
+          plan: PLAN,
+          isFree: false,
+          oldPlanName: 'basic',
+          periodEndsAt: '2027-05-01T00:00:00.000Z',
+        } as MailJobData),
+      );
+
+      expect(mailService.sendPlanUpdatedEmail).toHaveBeenCalledWith(
+        'a@example.com',
+        PLAN,
+        {
+          planName: 'basic',
+          periodEndsAt: new Date('2027-05-01T00:00:00.000Z'),
+        },
+      );
+    });
+
+    it('emails a Free publisher without a current period', async () => {
+      await processor.process(
+        job(MailJob.PLAN_UPDATED_NOTICE, {
+          ...DATA,
+          plan: { ...PLAN, price: 0 },
+          isFree: true,
+        } as MailJobData),
+      );
+
+      expect(mailService.sendPlanUpdatedEmail).toHaveBeenCalledWith(
+        'a@example.com',
+        { ...PLAN, price: 0 },
+        undefined,
+      );
+    });
+
+    it('emails a subscriber that the plan was deleted', async () => {
+      await processor.process(
+        job(MailJob.PLAN_DELETED_NOTICE, {
+          ...DATA,
+          planName: 'basic',
+          periodEndsAt: '2027-05-01T00:00:00.000Z',
+        } as MailJobData),
+      );
+
+      expect(mailService.sendPlanDeletedEmail).toHaveBeenCalledWith(
+        'a@example.com',
+        'basic',
+        new Date('2027-05-01T00:00:00.000Z'),
+      );
+    });
+
+    it('logs the fan-out job without a user id', () => {
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+
+      processor.onCompleted(
+        job(MailJob.PLAN_UPDATED, {
+          planId: 'plan-1',
+        } as unknown as MailJobData),
+      );
+
+      expect(log).toHaveBeenCalledWith('Job plan-updated (1) xong');
+    });
   });
 });

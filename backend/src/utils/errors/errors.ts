@@ -53,6 +53,12 @@ export const ERRORS = {
     status: HttpStatus.SERVICE_UNAVAILABLE,
     message: 'Hệ thống đang tạm thời gián đoạn, vui lòng thử lại sau',
   },
+  // PATCH không có trường nào để sửa (chỉ có note hoặc body rỗng)
+  NOTHING_TO_UPDATE: {
+    code: 1007,
+    status: HttpStatus.BAD_REQUEST,
+    message: 'Chưa sửa trường nào',
+  },
 
   EMAIL_ALREADY_EXISTS: {
     code: 2000,
@@ -139,5 +145,16 @@ export const ERRORS = {
     code: 3004,
     status: HttpStatus.CONFLICT,
     message: 'Gói này với thời hạn này đã tồn tại',
+  },
+  // Gói Free (duration 'infinity') luôn miễn phí và không xóa được
+  FREE_PLAN_PRICE_LOCKED: {
+    code: 3006,
+    status: HttpStatus.CONFLICT,
+    message: 'Không được đổi giá gói Free',
+  },
+  FREE_PLAN_NOT_DELETABLE: {
+    code: 3007,
+    status: HttpStatus.CONFLICT,
+    message: 'Không được xóa gói Free',
   },
 } as const satisfies Record<string, ErrorDefinition>;

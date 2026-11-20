@@ -8,8 +8,10 @@ export enum MailJob {
   ACCOUNT_PASSWORD_RESET = 'account-password-reset',
   PUBLISHER_SUSPENDED = 'publisher-suspended',
   PUBLISHER_UNSUSPENDED = 'publisher-unsuspended',
-  // Báo tài khoản (kiểm duyệt viên) đã bị admin xóa; user không còn trong DB nên job mang sẵn email
   ACCOUNT_DELETED = 'account-deleted',
+  PLAN_UPDATED = 'plan-updated',
+  PLAN_UPDATED_NOTICE = 'plan-updated-notice',
+  PLAN_DELETED_NOTICE = 'plan-deleted-notice',
 }
 
 export type AccountType = 'publisher' | 'editor' | 'moderator';
@@ -25,11 +27,9 @@ export interface PasswordChangedJobData extends MailJobData {
 
 export interface AccountCredentialsJobData extends MailJobData {
   accountType: AccountType;
-  // Lý do đặt lại mật khẩu (ghi chú của admin/KDV), in ở cuối email
   reason?: string;
 }
 
-// Báo NXB bị đình chỉ / được mở khóa, kèm lý do do admin/KDV nhập
 export interface PublisherStatusJobData extends MailJobData {
   publisherName: string;
   reason: string;
@@ -37,4 +37,27 @@ export interface PublisherStatusJobData extends MailJobData {
 
 export interface AccountDeletedJobData extends MailJobData {
   accountType: AccountType;
+}
+
+export interface PlanUpdatedJobData {
+  planId: string;
+}
+
+export interface PlanSnapshot {
+  name: string;
+  price: number;
+  bookLimit: number;
+  editorLimit: number;
+}
+
+export interface PlanUpdatedNoticeJobData extends MailJobData {
+  plan: PlanSnapshot;
+  isFree: boolean;
+  oldPlanName?: string;
+  periodEndsAt?: string;
+}
+
+export interface PlanDeletedNoticeJobData extends MailJobData {
+  planName: string;
+  periodEndsAt: string;
 }

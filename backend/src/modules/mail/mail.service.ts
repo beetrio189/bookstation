@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 import { env } from '../../config';
-import { AccountType } from './mail-queue.constants';
+import { AccountType, PlanSnapshot } from './mail-queue.constants';
 
-// Link trong email mang cả uid lẫn token: Redis lưu token theo uid
 const buildLink = (path: string, userId: string, token: string) =>
   `${env.feUrl}/${path}?${new URLSearchParams({ uid: userId, token }).toString()}`;
 
@@ -19,6 +18,16 @@ const escapeHtml = (value: string) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+
+const formatNumber = (value: number) => value.toLocaleString('vi-VN');
+
+const formatDate = (value: Date) =>
+  value.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+const describePlan = ({ name, price, bookLimit, editorLimit }: PlanSnapshot) =>
+  `<b>${escapeHtml(name)}</b>: tối đa ${formatNumber(bookLimit)} cuốn sách, ` +
+  `${formatNumber(editorLimit)} biên tập viên, giá ` +
+  (price === 0 ? 'miễn phí' : `${formatNumber(price)} đ`);
 
 interface MailMessage {
   to: string;
@@ -189,6 +198,50 @@ export class MailService {
         <p>Lý do: ${escapeHtml(reason)}</p>
       `,
       devNote: `nhà xuất bản ${publisherName} được mở khóa, lý do: ${reason}`,
+    });
+  }
+
+  /**
+   * Admin đổi giá / hạn mức gói. Gói trả phí: báo gói NXB đang dùng (tên lúc mua)
+   * đã được thay đổi, hạn mức hiện tại giữ đến hết kỳ. Gói Free: báo hạn mức mới.
+   */
+  async sendPlanUpdatedEmail(
+    to: string,
+    plan: PlanSnapshot,
+    current?: { planName: string; periodEndsAt: Date },
+  ): Promise<void> {
+    const body = current
+      ? `<p>Gói <b>${escapeHtml(current.planName)}</b> mà nhà xuất bản của bạn đang dùng đã được thay đổi thành gói ${describePlan(plan)}.</p>
+        <p>Hạn mức gói hiện tại của bạn vẫn được giữ nguyên đến hết kỳ (ngày ${formatDate(current.periodEndsAt)}).</p>`
+      : `<p>Chúng tôi vừa thay đổi gói ${describePlan(plan)}.</p>`;
+
+    await this.send({
+      to,
+      subject: 'Gói hội viên BookStation đã được thay đổi',
+      html: `
+        <p>Chào bạn,</p>
+        ${body}
+        <p>Nếu có thắc mắc, hãy liên hệ bookstationadmin@gmail.com.</p>
+      `,
+      devNote: `gói ${plan.name} đã thay đổi (giá ${plan.price}, ${plan.bookLimit} sách, ${plan.editorLimit} biên tập viên)`,
+    });
+  }
+
+  async sendPlanDeletedEmail(
+    to: string,
+    planName: string,
+    periodEndsAt: Date,
+  ): Promise<void> {
+    await this.send({
+      to,
+      subject: 'Gói hội viên BookStation của bạn đã ngừng cung cấp',
+      html: `
+        <p>Chào bạn,</p>
+        <p>Gói <b>${escapeHtml(planName)}</b> mà nhà xuất bản của bạn đang dùng đã ngừng cung cấp trên BookStation.</p>
+        <p>Hạn mức gói hiện tại của bạn vẫn được giữ nguyên đến hết kỳ (ngày ${formatDate(periodEndsAt)}). Sau đó bạn có thể chọn mua gói khác.</p>
+        <p>Nếu có thắc mắc, hãy liên hệ bookstationadmin@gmail.com.</p>
+      `,
+      devNote: `gói ${planName} đã ngừng cung cấp`,
     });
   }
 

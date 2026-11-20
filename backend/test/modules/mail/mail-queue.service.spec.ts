@@ -120,4 +120,38 @@ describe('MailQueueService', () => {
       accountType: 'moderator',
     });
   });
+
+  it('queues a plan update by id only', async () => {
+    const queue = { add: jest.fn() };
+
+    await new MailQueueService(queue as unknown as Queue).enqueuePlanUpdated(
+      'plan-1',
+    );
+
+    expect(queue.add).toHaveBeenCalledWith(MailJob.PLAN_UPDATED, {
+      planId: 'plan-1',
+    });
+  });
+
+  it('queues one plan notice per publisher in a single call', async () => {
+    const queue = { addBulk: jest.fn() };
+    const notice = {
+      userId: 'user-1',
+      email: 'a@example.com',
+      planName: 'basic',
+      periodEndsAt: '2027-05-01T00:00:00.000Z',
+    };
+
+    await new MailQueueService(
+      queue as unknown as Queue,
+    ).enqueuePlanDeletedNotices([notice, { ...notice, userId: 'user-2' }]);
+
+    expect(queue.addBulk).toHaveBeenCalledWith([
+      { name: MailJob.PLAN_DELETED_NOTICE, data: notice },
+      {
+        name: MailJob.PLAN_DELETED_NOTICE,
+        data: { ...notice, userId: 'user-2' },
+      },
+    ]);
+  });
 });

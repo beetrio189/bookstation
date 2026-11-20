@@ -69,7 +69,9 @@ CREATE TYPE "system_action_type" AS ENUM (
   'book_deletion',
   'book_review',
   'review_deletion',
-  'plan_creation'
+  'plan_creation',
+  'plan_update',
+  'plan_deletion'
 );
 
 /* Bảng */
@@ -223,7 +225,6 @@ CREATE TABLE "plans" (
   "price" integer NOT NULL CHECK ("price" >= 0),
   "book_limit" integer NOT NULL CHECK ("book_limit" >= 0),
   "editor_limit" integer NOT NULL CHECK ("editor_limit" >= 0),
-  "is_active" bool NOT NULL DEFAULT true,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now()),
   UNIQUE ("name", "duration"),
@@ -255,6 +256,9 @@ CREATE TABLE "payments" (
 CREATE UNIQUE INDEX ON "refresh_tokens" ("token_hash");
 
 CREATE INDEX ON "refresh_tokens" ("user_id");
+
+-- Chỉ đúng 1 gói vô thời hạn (gói Free)
+CREATE UNIQUE INDEX "plans_single_free_idx" ON "plans" ((true)) WHERE "duration" = 'infinity';
 
 CREATE INDEX ON "payments" ("publisher_id", "created_at");
 
@@ -442,23 +446,36 @@ ALTER TABLE "payments" ADD FOREIGN KEY ("publisher_id") REFERENCES "publishers" 
 ALTER TABLE "payments" ADD FOREIGN KEY ("plan_id") REFERENCES "plans" ("id") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
 
 /* Gói Free: migration tạo sẵn (price 0, duration 'infinity', hạn mức 0), là dòng duy nhất có duration infinity.
-   Nhận diện bằng duration vì admin đổi được tên (và mô tả, hạn mức); chặn đổi duration, price, is_active */
+   Nhận diện bằng duration vì admin đổi được tên (và mô tả, hạn mức); chặn đổi duration, price và chặn xóa.
+   Gói trả phí không bán nữa thì xóa hẳn (không có cột ẩn): payments.plan_id thành NULL, lịch sử nằm ở snapshot */
 
 CREATE FUNCTION "protect_free_plan"() RETURNS trigger AS $$
 BEGIN
-  IF OLD."duration" = 'infinity' AND (
-    NEW."duration" IS DISTINCT FROM OLD."duration"
-    OR NEW."price" IS DISTINCT FROM OLD."price"
-    OR NEW."is_active" IS DISTINCT FROM OLD."is_active"
-  ) THEN
-    RAISE EXCEPTION 'Không được đổi duration, price, is_active của gói Free';
+  IF OLD."duration" = 'infinity' THEN
+    IF TG_OP = 'DELETE' THEN
+      RAISE EXCEPTION 'Không được xóa gói Free';
+    END IF;
+
+    IF NEW."duration" IS DISTINCT FROM OLD."duration"
+      OR NEW."price" IS DISTINCT FROM OLD."price" THEN
+      RAISE EXCEPTION 'Không được đổi duration, price của gói Free';
+    END IF;
   END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "plans_protect_free_plan"
 BEFORE UPDATE ON "plans"
+FOR EACH ROW EXECUTE FUNCTION "protect_free_plan"();
+
+CREATE TRIGGER "plans_protect_free_plan_delete"
+BEFORE DELETE ON "plans"
 FOR EACH ROW EXECUTE FUNCTION "protect_free_plan"();
 
 COMMENT ON TABLE "plans" IS 'Gói hội viên NXB. duration là interval (6 months, 1 year…); gói "Free" có duration = infinity, migration tạo sẵn.';

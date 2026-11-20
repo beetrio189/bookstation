@@ -15,6 +15,7 @@ import { User } from '../modules/users/entities/user.entity';
 import { UsersService } from '../modules/users/users.service';
 import { MailProcessor } from './mail.processor';
 import { MaintenanceProcessor } from './maintenance.processor';
+import { PlanNoticeService } from './plan-notice.service';
 
 // Root module của worker: không có HTTP, controller hay guard, chỉ xử lý job
 @Module({
@@ -33,6 +34,7 @@ import { MaintenanceProcessor } from './maintenance.processor';
     MaintenanceProcessor,
     RefreshTokenService,
     UsersService,
+    PlanNoticeService,
   ],
 })
 export class WorkerModule {}

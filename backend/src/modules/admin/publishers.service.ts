@@ -94,7 +94,6 @@ const SLUG_CONSTRAINT = 'publishers_slug_key';
 const USER_NAME_LENGTH = 100;
 const FUZZY_MIN_LENGTH = 3;
 
-// Tên gói Free hiện tại (admin đổi được), nhận diện bằng duration
 const FREE_PLAN_NAME_SQL = `SELECT fp.name FROM plans fp WHERE fp.duration = '${FREE_PLAN_DURATION}'`;
 
 const CURRENT_PAYMENT_SQL = `SELECT {col} FROM payments pm
@@ -150,7 +149,6 @@ export class PublishersService {
 
     await this.enqueueCredentialsEmail(publisher.userId, email);
 
-    // NXB mới chưa mua gói: đang ở gói Free
     const freePlan = await this.manager.findOneOrFail(Plan, {
       select: { name: true },
       where: { duration: FREE_PLAN_DURATION },

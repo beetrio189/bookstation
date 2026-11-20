@@ -230,7 +230,9 @@ describe('MailService', () => {
     ];
 
     expect(to).toBe('nxb@example.com');
-    expect(subject).toBe('Nhà xuất bản của bạn đã bị đình chỉ trên BookStation');
+    expect(subject).toBe(
+      'Nhà xuất bản của bạn đã bị đình chỉ trên BookStation',
+    );
     expect(html).toContain('<b>NXB &lt;Kim Đồng&gt;</b> đã bị đình chỉ');
     expect(html.trim()).toMatch(
       /<p>Lý do: Tài khoản bị chiếm &amp; có biên tập viên lạ<\/p>$/,
@@ -251,7 +253,9 @@ describe('MailService', () => {
       { subject: string; html: string },
     ];
 
-    expect(subject).toBe('Nhà xuất bản của bạn đã được mở khóa trên BookStation');
+    expect(subject).toBe(
+      'Nhà xuất bản của bạn đã được mở khóa trên BookStation',
+    );
     expect(html).toContain('href="http://localhost:3000/login"');
     expect(html.trim()).toMatch(/<p>Lý do: Đã xác minh<\/p>$/);
   });
@@ -275,5 +279,71 @@ describe('MailService', () => {
     );
     expect(html).toContain('<b>kdv@example.com</b> đã bị quản trị viên xóa');
     expect(html).not.toContain('Lý do');
+  });
+
+  describe('plan emails', () => {
+    const PLAN = {
+      name: 'Basic <Plus>',
+      price: 600000,
+      bookLimit: 100000,
+      editorLimit: 2,
+    };
+    const sentHtml = () =>
+      (send.mock.calls[0] as [{ subject: string; html: string }])[0];
+
+    beforeEach(() => {
+      env.resendApiKey = 're_test';
+      send.mockResolvedValue({ data: { id: '1' }, error: null });
+    });
+
+    it('tells a subscriber the plan was changed, with escaped names, limits, price, and the end of the period', async () => {
+      await new MailService().sendPlanUpdatedEmail('nxb@example.com', PLAN, {
+        planName: 'basic & co',
+        periodEndsAt: new Date('2027-05-01T05:00:00.000Z'),
+      });
+
+      const { subject, html } = sentHtml();
+
+      expect(subject).toBe('Gói hội viên BookStation đã được thay đổi');
+      expect(html).toContain('Gói <b>basic &amp; co</b>');
+      expect(html).toContain(
+        'đã được thay đổi thành gói <b>Basic &lt;Plus&gt;</b>',
+      );
+      expect(html).toContain(
+        '100.000 cuốn sách, 2 biên tập viên, giá 600.000 đ',
+      );
+      expect(html).toContain('đến hết kỳ (ngày 1/5/2027)');
+      expect(html).not.toContain('đổi tên');
+    });
+
+    it('tells a Free publisher the new limits, priced as free', async () => {
+      await new MailService().sendPlanUpdatedEmail('nxb@example.com', {
+        ...PLAN,
+        name: 'Free',
+        price: 0,
+      });
+
+      const { html } = sentHtml();
+
+      expect(html).toContain('Chúng tôi vừa thay đổi gói <b>Free</b>');
+      expect(html).toContain('giá miễn phí');
+      expect(html).not.toContain('hết kỳ');
+    });
+
+    it('tells a subscriber the plan was deleted, keeping the limits until the end of the period', async () => {
+      await new MailService().sendPlanDeletedEmail(
+        'nxb@example.com',
+        'Pro <x>',
+        new Date('2027-05-01T05:00:00.000Z'),
+      );
+
+      const { subject, html } = sentHtml();
+
+      expect(subject).toBe(
+        'Gói hội viên BookStation của bạn đã ngừng cung cấp',
+      );
+      expect(html).toContain('Gói <b>Pro &lt;x&gt;</b>');
+      expect(html).toContain('đến hết kỳ (ngày 1/5/2027)');
+    });
   });
 });

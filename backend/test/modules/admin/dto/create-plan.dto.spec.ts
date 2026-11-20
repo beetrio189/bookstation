@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { CreatePlanDto } from '../../../../src/modules/admin/dto/create-plan.dto';
+import { UpdatePlanDto } from '../../../../src/modules/admin/dto/update-plan.dto';
 import { validationExceptionFactory } from '../../../../src/utils/errors/validation-exception.factory';
 
 const pipe = new ValidationPipe({
@@ -7,10 +8,10 @@ const pipe = new ValidationPipe({
   whitelist: true,
   exceptionFactory: validationExceptionFactory,
 });
-const body = (value: unknown) =>
-  pipe.transform(value, { type: 'body', metatype: CreatePlanDto });
+const body = (value: unknown, metatype: new () => object = CreatePlanDto) =>
+  pipe.transform(value, { type: 'body', metatype });
 const VALID = {
-  name: 'basic',
+  name: 'Basic',
   durationMonths: 6,
   description: 'Cho NXB nhỏ',
   price: 500000,
@@ -20,15 +21,15 @@ const VALID = {
 };
 
 describe('CreatePlanDto', () => {
-  it('trims and lowercases the name, trims text, and drops unknown fields', async () => {
+  it('keeps the case of the name, trims and collapses spaces, and drops unknown fields', async () => {
     await expect(
       body({
         ...VALID,
-        name: '  Basic ',
+        name: '  Basic   Plus 2 ',
         description: ' Cho NXB nhỏ ',
-        isActive: false,
+        bookCount: 5,
       }),
-    ).resolves.toEqual(VALID);
+    ).resolves.toEqual({ ...VALID, name: 'Basic Plus 2' });
   });
 
   it('accepts a plan without description, note, and with zero limits', async () => {
@@ -44,8 +45,8 @@ describe('CreatePlanDto', () => {
   });
 
   it('accepts the same name as the Free plan (only name + duration must be unique)', async () => {
-    await expect(body({ ...VALID, name: ' FREE ' })).resolves.toMatchObject({
-      name: 'free',
+    await expect(body({ ...VALID, name: 'Free' })).resolves.toMatchObject({
+      name: 'Free',
     });
   });
 
@@ -56,7 +57,9 @@ describe('CreatePlanDto', () => {
   });
 
   it.each([
-    ['a name with spaces', { name: 'gói cơ bản' }],
+    ['a name with Vietnamese letters', { name: 'Gói cơ bản' }],
+    ['a name with a dash', { name: 'basic-plus' }],
+    ['a name with HTML', { name: '<b>Pro</b>' }],
     ['a blank name', { name: '  ' }],
     ['a name over 50 characters', { name: 'a'.repeat(51) }],
     ['0 months', { durationMonths: 0 }],
@@ -72,6 +75,31 @@ describe('CreatePlanDto', () => {
     ['a missing price', { price: undefined }],
   ])('rejects %s', async (_label, change) => {
     await expect(body({ ...VALID, ...change })).rejects.toMatchObject({
+      status: 400,
+    });
+  });
+});
+
+describe('UpdatePlanDto', () => {
+  it('accepts a partial body with the same rules and drops durationMonths', async () => {
+    await expect(
+      body({ name: ' Pro  Max ', price: 1, durationMonths: 12 }, UpdatePlanDto),
+    ).resolves.toEqual({ name: 'Pro Max', price: 1, note: '' });
+  });
+
+  it('accepts an empty description (clears it)', async () => {
+    await expect(
+      body({ description: '  ' }, UpdatePlanDto),
+    ).resolves.toMatchObject({ description: '' });
+  });
+
+  it.each([
+    ['a blank name', { name: ' ' }],
+    ['a name with a dash', { name: 'a-b' }],
+    ['a zero price', { price: 0 }],
+    ['a negative limit', { editorLimit: -1 }],
+  ])('rejects %s', async (_label, value) => {
+    await expect(body(value, UpdatePlanDto)).rejects.toMatchObject({
       status: 400,
     });
   });

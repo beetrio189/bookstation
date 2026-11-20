@@ -9,6 +9,9 @@ import {
   MailJob,
   MailJobData,
   PasswordChangedJobData,
+  PlanDeletedNoticeJobData,
+  PlanUpdatedJobData,
+  PlanUpdatedNoticeJobData,
   PublisherStatusJobData,
 } from './mail-queue.constants';
 
@@ -16,7 +19,7 @@ import {
 export class MailQueueService {
   constructor(
     @InjectQueue(MAIL_QUEUE)
-    private readonly queue: Queue<MailJobData>,
+    private readonly queue: Queue<MailJobData | PlanUpdatedJobData>,
   ) {}
 
   async enqueueVerificationEmail(userId: string, email: string): Promise<void> {
@@ -84,5 +87,27 @@ export class MailQueueService {
     const data: AccountDeletedJobData = { userId, email, accountType };
 
     await this.queue.add(MailJob.ACCOUNT_DELETED, data);
+  }
+
+  async enqueuePlanUpdated(planId: string): Promise<void> {
+    const data: PlanUpdatedJobData = { planId };
+
+    await this.queue.add(MailJob.PLAN_UPDATED, data);
+  }
+
+  async enqueuePlanUpdatedNotices(
+    notices: PlanUpdatedNoticeJobData[],
+  ): Promise<void> {
+    await this.queue.addBulk(
+      notices.map((data) => ({ name: MailJob.PLAN_UPDATED_NOTICE, data })),
+    );
+  }
+
+  async enqueuePlanDeletedNotices(
+    notices: PlanDeletedNoticeJobData[],
+  ): Promise<void> {
+    await this.queue.addBulk(
+      notices.map((data) => ({ name: MailJob.PLAN_DELETED_NOTICE, data })),
+    );
   }
 }

@@ -13,11 +13,15 @@ import {
   MailJob,
   MailJobData,
   PasswordChangedJobData,
+  PlanDeletedNoticeJobData,
+  PlanUpdatedJobData,
+  PlanUpdatedNoticeJobData,
   PublisherStatusJobData,
 } from '../modules/mail/mail-queue.constants';
 import { MailService } from '../modules/mail/mail.service';
 import { UsersService } from '../modules/users/users.service';
 import { generatePassword, hashPassword } from '../utils/password';
+import { PlanNoticeService } from './plan-notice.service';
 
 export const VERIFY_EMAIL_TTL_SECONDS = 24 * 60 * 60;
 export const RESET_PASSWORD_TTL_SECONDS = 24 * 60 * 60;
@@ -34,6 +38,7 @@ export class MailProcessor extends WorkerHost {
     private readonly oneTimeTokenService: OneTimeTokenService,
     private readonly mailService: MailService,
     private readonly usersService: UsersService,
+    private readonly planNoticeService: PlanNoticeService,
   ) {
     super();
   }
@@ -94,6 +99,32 @@ export class MailProcessor extends WorkerHost {
           reason,
         );
       }
+      case MailJob.PLAN_UPDATED:
+        return this.planNoticeService.fanOutPlanUpdated(
+          (job.data as unknown as PlanUpdatedJobData).planId,
+        );
+      case MailJob.PLAN_UPDATED_NOTICE: {
+        const { email, plan, oldPlanName, periodEndsAt } =
+          job.data as PlanUpdatedNoticeJobData;
+
+        return this.mailService.sendPlanUpdatedEmail(
+          email,
+          plan,
+          oldPlanName && periodEndsAt
+            ? { planName: oldPlanName, periodEndsAt: new Date(periodEndsAt) }
+            : undefined,
+        );
+      }
+      case MailJob.PLAN_DELETED_NOTICE: {
+        const { email, planName, periodEndsAt } =
+          job.data as PlanDeletedNoticeJobData;
+
+        return this.mailService.sendPlanDeletedEmail(
+          email,
+          planName,
+          new Date(periodEndsAt),
+        );
+      }
       default:
         throw new Error(`Không có xử lý cho job ${job.name}`);
     }
@@ -101,8 +132,11 @@ export class MailProcessor extends WorkerHost {
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job<MailJobData>) {
+    // Job gom PLAN_UPDATED không gửi cho ai cụ thể (không có userId)
     this.logger.log(
-      `Job ${job.name} (${job.id}) gửi xong cho user ${job.data.userId}`,
+      job.data.userId
+        ? `Job ${job.name} (${job.id}) gửi xong cho user ${job.data.userId}`
+        : `Job ${job.name} (${job.id}) xong`,
     );
   }
 

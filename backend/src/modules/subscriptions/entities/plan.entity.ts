@@ -6,7 +6,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-// Gói Free là dòng duy nhất có duration 'infinity': nhận diện bằng duration, không bằng tên (admin đổi tên được)
 export const FREE_PLAN_DURATION = 'infinity';
 
 @Entity('plans')
@@ -31,9 +30,6 @@ export class Plan {
 
   @Column({ name: 'editor_limit', type: 'integer' })
   editorLimit: number;
-
-  @Column({ name: 'is_active', type: 'boolean', default: true })
-  isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
