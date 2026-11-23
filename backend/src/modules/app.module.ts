@@ -16,7 +16,6 @@ import { BULLMQ_ROOT_OPTIONS } from '../libs/bullmq.config';
 import dataSource from '../libs/typeorm.config';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
-import { DevModule } from './dev/dev.module';
 import { HealthCheckModule } from './health-check/health-check.module';
 import { PublishersModule } from './publishers/publishers.module';
 import { REDIS_CLIENT, RedisModule } from './redis/redis.module';
@@ -51,7 +50,6 @@ import { UsersModule } from './users/users.module';
     AdminModule,
     SubscriptionsModule,
     PublishersModule,
-    ...(env.nodeEnv === 'production' ? [] : [DevModule]),
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

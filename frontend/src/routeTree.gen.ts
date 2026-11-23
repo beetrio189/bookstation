@@ -14,7 +14,6 @@ import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as PublisherRouteRouteImport } from './routes/publisher/route'
 import { Route as ReaderIndexRouteImport } from './routes/_reader/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as DevSepayRouteImport } from './routes/dev/sepay'
 import { Route as ForgotPasswordIndexRouteImport } from './routes/forgot-password/index'
 import { Route as ForgotPasswordSentRouteImport } from './routes/forgot-password/sent'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
@@ -65,11 +64,6 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRouteRoute,
-} as any)
-const DevSepayRoute = DevSepayRouteImport.update({
-  id: '/dev/sepay',
-  path: '/dev/sepay',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordIndexRoute = ForgotPasswordIndexRouteImport.update({
   id: '/forgot-password/',
@@ -210,7 +204,6 @@ export interface FileRoutesByFullPath {
   '/': typeof ReaderIndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/publisher': typeof PublisherRouteRouteWithChildren
-  '/dev/sepay': typeof DevSepayRoute
   '/forgot-password/sent': typeof ForgotPasswordSentRoute
   '/register/sent': typeof RegisterSentRoute
   '/reset-password/done': typeof ResetPasswordDoneRoute
@@ -240,7 +233,6 @@ export interface FileRoutesByFullPath {
   '/admin/publishers/$id/editors/': typeof AdminPublishersIdEditorsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/dev/sepay': typeof DevSepayRoute
   '/forgot-password/sent': typeof ForgotPasswordSentRoute
   '/register/sent': typeof RegisterSentRoute
   '/reset-password/done': typeof ResetPasswordDoneRoute
@@ -275,7 +267,6 @@ export interface FileRoutesById {
   '/_reader': typeof ReaderRouteRouteWithChildren
   '/admin': typeof AdminRouteRouteWithChildren
   '/publisher': typeof PublisherRouteRouteWithChildren
-  '/dev/sepay': typeof DevSepayRoute
   '/forgot-password/sent': typeof ForgotPasswordSentRoute
   '/register/sent': typeof RegisterSentRoute
   '/reset-password/done': typeof ResetPasswordDoneRoute
@@ -311,7 +302,6 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/publisher'
-    | '/dev/sepay'
     | '/forgot-password/sent'
     | '/register/sent'
     | '/reset-password/done'
@@ -341,7 +331,6 @@ export interface FileRouteTypes {
     | '/admin/publishers/$id/editors/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/dev/sepay'
     | '/forgot-password/sent'
     | '/register/sent'
     | '/reset-password/done'
@@ -375,7 +364,6 @@ export interface FileRouteTypes {
     | '/_reader'
     | '/admin'
     | '/publisher'
-    | '/dev/sepay'
     | '/forgot-password/sent'
     | '/register/sent'
     | '/reset-password/done'
@@ -410,7 +398,6 @@ export interface RootRouteChildren {
   ReaderRouteRoute: typeof ReaderRouteRouteWithChildren
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
   PublisherRouteRoute: typeof PublisherRouteRouteWithChildren
-  DevSepayRoute: typeof DevSepayRoute
   ForgotPasswordSentRoute: typeof ForgotPasswordSentRoute
   RegisterSentRoute: typeof RegisterSentRoute
   ResetPasswordDoneRoute: typeof ResetPasswordDoneRoute
@@ -460,13 +447,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRouteRoute
-    }
-    '/dev/sepay': {
-      id: '/dev/sepay'
-      path: '/dev/sepay'
-      fullPath: '/dev/sepay'
-      preLoaderRoute: typeof DevSepayRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/forgot-password/': {
       id: '/forgot-password/'
@@ -721,7 +701,6 @@ const rootRouteChildren: RootRouteChildren = {
   ReaderRouteRoute: ReaderRouteRouteWithChildren,
   AdminRouteRoute: AdminRouteRouteWithChildren,
   PublisherRouteRoute: PublisherRouteRouteWithChildren,
-  DevSepayRoute: DevSepayRoute,
   ForgotPasswordSentRoute: ForgotPasswordSentRoute,
   RegisterSentRoute: RegisterSentRoute,
   ResetPasswordDoneRoute: ResetPasswordDoneRoute,
