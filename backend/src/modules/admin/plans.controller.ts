@@ -12,7 +12,7 @@ import { IdParam } from '../../decorators/id-param.decorator';
 import { Roles } from '../../decorators/roles.decorator';
 import { RoleCode } from '../../utils/enums/role-code.enum';
 import type { AuthUser } from '../../utils/types/auth-user';
-import { ActionNoteDto } from './dto/action-note.dto';
+import { RequiredNoteDto } from './dto/required-note.dto';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { PlansService } from './plans.service';
@@ -47,7 +47,7 @@ export class PlansController {
   remove(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() dto: ActionNoteDto,
+    @Body() dto: RequiredNoteDto,
   ) {
     return this.plansService.remove(user.id, id, dto);
   }

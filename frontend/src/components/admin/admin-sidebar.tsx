@@ -1,87 +1,34 @@
-import { Link } from "@tanstack/react-router";
-import { Building2, Menu, ShieldCheck, type LucideIcon } from "lucide-react";
-import { useState, type MouseEvent } from "react";
-import { Dialog } from "radix-ui";
-import { Logo } from "@/components/logo";
+import { Building2, Package, ShieldCheck } from "lucide-react";
+import {
+  AreaMobileNav,
+  AreaSidebar,
+  type AreaNavItem,
+} from "@/components/area-sidebar";
+import { getRole } from "@/lib/session";
 
-const NAV: {
-  to: "/admin/publishers" | "/admin/moderators";
-  label: string;
-  icon: LucideIcon;
-}[] = [
+const NAV: (AreaNavItem & {
+  // Chỉ admin thấy (KDV không quản lý gói)
+  adminOnly?: boolean;
+})[] = [
   { to: "/admin/publishers", label: "Nhà xuất bản", icon: Building2 },
   { to: "/admin/moderators", label: "Kiểm duyệt viên", icon: ShieldCheck },
+  { to: "/admin/plans", label: "Gói hội viên", icon: Package, adminOnly: true },
 ];
 
-const ITEM_CLASS =
-  "flex items-center gap-3.5 rounded-xl px-5 py-3.5 text-lg font-semibold";
+function navProps() {
+  const isAdmin = getRole() === "admin";
 
-// Theo Figma "Khung quản trị": logo, nhãn QUẢN TRỊ, mục đang chọn nền đỏ
-function AdminNav() {
-  return (
-    <>
-      <Logo to="/admin" />
-      <p className="mt-10 mb-1 text-sm font-bold text-foreground/50">QUẢN TRỊ</p>
-      <nav className="flex flex-col gap-2">
-        {NAV.map(({ to, label, icon: Icon }) => (
-          // Link tự gắn aria-current="page" khi đang ở trang đó hoặc trang con (chi tiết)
-          <Link
-            key={to}
-            to={to}
-            className={ITEM_CLASS}
-            activeProps={{ className: "bg-[#ff6d6d] font-bold text-white" }}
-            inactiveProps={{ className: "hover:bg-foreground/5" }}
-          >
-            <Icon className="size-6" />
-            {label}
-          </Link>
-        ))}
-      </nav>
-    </>
-  );
-}
-
-const PANEL_CLASS = "flex w-75 shrink-0 flex-col gap-2 px-6 py-10";
-
-// Màn rộng (từ lg): sidebar cố định bên trái
-export function AdminSidebar() {
-  return (
-    <aside className={`${PANEL_CLASS} hidden border-r-2 border-foreground lg:flex`}>
-      <AdminNav />
-    </aside>
-  );
-}
-
-// Màn hẹp (dưới lg): nút ☰ mở sidebar dạng ngăn trượt từ trái
-export function AdminMobileNav() {
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Bấm vào bất kỳ liên kết nào trong ngăn (mục menu, logo) thì đóng ngăn
-  const closeOnLink = (event: MouseEvent) => {
-    if ((event.target as Element).closest("a")) {
-      setIsOpen(false);
-    }
+  return {
+    home: "/admin" as const,
+    label: "QUẢN TRỊ",
+    items: NAV.filter((item) => isAdmin || !item.adminOnly),
   };
+}
 
-  return (
-    <Dialog.Root open={isOpen} onOpenChange={setIsOpen}>
-      <Dialog.Trigger
-        aria-label="Mở menu"
-        className="rounded-lg p-2 hover:bg-foreground/5 lg:hidden"
-      >
-        <Menu className="size-7" />
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-foreground/45 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 lg:hidden" />
-        <Dialog.Content
-          aria-describedby={undefined}
-          onClick={closeOnLink}
-          className={`${PANEL_CLASS} fixed inset-y-0 left-0 z-50 max-w-[85vw] bg-cream text-foreground outline-none data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:slide-out-to-left lg:hidden`}
-        >
-          <Dialog.Title className="sr-only">Menu quản trị</Dialog.Title>
-          <AdminNav />
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
+export function AdminSidebar() {
+  return <AreaSidebar {...navProps()} />;
+}
+
+export function AdminMobileNav() {
+  return <AreaMobileNav {...navProps()} />;
 }

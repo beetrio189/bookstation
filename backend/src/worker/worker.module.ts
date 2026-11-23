@@ -13,11 +13,14 @@ import { RedisModule } from '../modules/redis/redis.module';
 import { Provider } from '../modules/users/entities/provider.entity';
 import { User } from '../modules/users/entities/user.entity';
 import { UsersService } from '../modules/users/users.service';
+import { ExpiredPaymentsService } from './expired-payments.service';
 import { MailProcessor } from './mail.processor';
 import { MaintenanceProcessor } from './maintenance.processor';
+import { NewPasswordMailService } from './new-password-mail.service';
+import { PaymentReceiptService } from './payment-receipt.service';
 import { PlanNoticeService } from './plan-notice.service';
+import { TokenMailService } from './token-mail.service';
 
-// Root module của worker: không có HTTP, controller hay guard, chỉ xử lý job
 @Module({
   imports: [
     TypeOrmModule.forRoot({ ...dataSource.options, autoLoadEntities: true }),
@@ -35,6 +38,10 @@ import { PlanNoticeService } from './plan-notice.service';
     RefreshTokenService,
     UsersService,
     PlanNoticeService,
+    ExpiredPaymentsService,
+    PaymentReceiptService,
+    TokenMailService,
+    NewPasswordMailService,
   ],
 })
 export class WorkerModule {}

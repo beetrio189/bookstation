@@ -7,8 +7,8 @@ import {
   MaintenanceJob,
 } from './maintenance-queue.constants';
 
-// 0h mỗi ngày giờ Việt Nam
 const EVERY_DAY_AT_MIDNIGHT = { pattern: '0 0 * * *', tz: 'Asia/Ho_Chi_Minh' };
+const EVERY_MINUTE_MS = 60_000;
 
 @Injectable()
 export class MaintenanceQueueService implements OnApplicationBootstrap {
@@ -24,6 +24,15 @@ export class MaintenanceQueueService implements OnApplicationBootstrap {
       {
         name: MaintenanceJob.DELETE_EXPIRED_REFRESH_TOKENS,
         opts: DEFAULT_JOB_OPTIONS,
+      },
+    );
+
+    await this.queue.upsertJobScheduler(
+      MaintenanceJob.SETTLE_EXPIRED_PAYMENTS,
+      { every: EVERY_MINUTE_MS },
+      {
+        name: MaintenanceJob.SETTLE_EXPIRED_PAYMENTS,
+        opts: { ...DEFAULT_JOB_OPTIONS, attempts: 1 },
       },
     );
   }

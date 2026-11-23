@@ -7,7 +7,7 @@ export interface ErrorDefinition {
 }
 
 /**
- * 1xxx: lỗi chung, 2xxx: tài khoản, 3xxx: quản trị. Module mới dùng dải tiếp theo.
+ * 1xxx: lỗi chung, 2xxx: tài khoản, 3xxx: quản trị, 4xxx: mua gói / thanh toán. Module mới dùng dải tiếp theo.
  *
  * Quy ước với FE: phân loại lỗi theo `status`, không theo dải `code`.
  * - 429, 5xx (và khi không có response): lỗi hệ thống. FE hiện toast góc
@@ -156,5 +156,41 @@ export const ERRORS = {
     code: 3007,
     status: HttpStatus.CONFLICT,
     message: 'Không được xóa gói Free',
+  },
+
+  PLAN_NOT_PURCHASABLE: {
+    code: 4000,
+    status: HttpStatus.CONFLICT,
+    message: 'Gói này không mua được',
+  },
+  PLAN_LIMIT_EXCEEDED: {
+    code: 4001,
+    status: HttpStatus.CONFLICT,
+    message:
+      'Số sách hoặc biên tập viên hiện có vượt giới hạn của gói này, hãy giảm bớt trước khi mua',
+  },
+  PENDING_PAYMENT_EXISTS: {
+    code: 4003,
+    status: HttpStatus.CONFLICT,
+    message:
+      'Bạn đang có một đơn chờ thanh toán, hãy tiếp tục thanh toán hoặc hủy đơn đó trước khi mua gói khác',
+  },
+  // Tiếp tục thanh toán đơn đã success / failed
+  PAYMENT_NOT_PENDING: {
+    code: 4004,
+    status: HttpStatus.CONFLICT,
+    message: 'Đơn này không còn chờ thanh toán',
+  },
+  // Tiếp tục thanh toán đơn pending đã quá 15 phút (job sẽ hủy)
+  PAYMENT_EXPIRED: {
+    code: 4005,
+    status: HttpStatus.CONFLICT,
+    message: 'Đơn này đã hết hạn thanh toán, hãy hủy đơn rồi mua lại',
+  },
+  // Hủy đơn đã thanh toán (IPN về trước, hoặc SePay báo đã nhận tiền lúc hủy)
+  PAYMENT_ALREADY_PAID: {
+    code: 4006,
+    status: HttpStatus.CONFLICT,
+    message: 'Bạn đã thanh toán gói này rồi!',
   },
 } as const satisfies Record<string, ErrorDefinition>;

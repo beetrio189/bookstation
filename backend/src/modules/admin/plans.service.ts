@@ -6,15 +6,13 @@ import { SystemActionType } from '../../utils/enums/system-action-type.enum';
 import { AppException } from '../../utils/errors/app.exception';
 import { ERRORS } from '../../utils/errors/errors';
 import { MailQueueService } from '../mail/mail-queue.service';
-import {
-  FREE_PLAN_DURATION,
-  Plan,
-} from '../subscriptions/entities/plan.entity';
+import { Plan } from '../subscriptions/entities/plan.entity';
 import {
   findPlanSubscribers,
   PlanSubscriber,
 } from '../subscriptions/plan-subscribers';
-import { ActionNoteDto } from './dto/action-note.dto';
+import { PublicPlan, selectPlanFields } from '../subscriptions/plan-query';
+import { RequiredNoteDto } from './dto/required-note.dto';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { writeSystemLog } from './write-system-log';
@@ -30,38 +28,16 @@ export interface PlanCreated {
   createdAt: Date;
 }
 
-export interface PlanListItem {
-  id: string;
-  name: string;
-  durationMonths: number | null;
-  description: string | null;
-  price: number;
-  bookLimit: number;
-  editorLimit: number;
+export interface PlanListItem extends PublicPlan {
   createdAt: Date;
   updatedAt: Date;
 }
 
 const NOTIFIED_FIELDS = ['price', 'bookLimit', 'editorLimit'] as const;
 
-/**
- * Cột trả về của một gói. 'infinity' (gói Free) không đổi ra số tháng được (ép
- * int báo lỗi) nên trả NULL.
- */
-const selectPlanFields = (query: SelectQueryBuilder<Plan>) =>
-  query
-    .select('plan.id', 'id')
-    .addSelect('plan.name', 'name')
-    .addSelect('plan.description', 'description')
-    .addSelect('plan.price', 'price')
-    .addSelect(
-      `CASE WHEN plan.duration = '${FREE_PLAN_DURATION}' THEN NULL
-            ELSE (EXTRACT(YEAR FROM plan.duration) * 12 + EXTRACT(MONTH FROM plan.duration))::int
-       END`,
-      'durationMonths',
-    )
-    .addSelect('plan.book_limit', 'bookLimit')
-    .addSelect('plan.editor_limit', 'editorLimit')
+/** Cột của một gói cho admin: cột công khai + mốc thời gian. */
+const selectAdminPlanFields = (query: SelectQueryBuilder<Plan>) =>
+  selectPlanFields(query)
     .addSelect('plan.created_at', 'createdAt')
     .addSelect('plan.updated_at', 'updatedAt');
 
@@ -82,7 +58,7 @@ export class PlansService {
 
   /** Mọi gói, kể cả gói Free. Sắp theo thời hạn rồi giá: gói Free tự xuống cuối. */
   async list(): Promise<{ items: PlanListItem[] }> {
-    const items = await selectPlanFields(
+    const items = await selectAdminPlanFields(
       this.plansRepository.createQueryBuilder('plan'),
     )
       .orderBy('plan.duration', 'ASC')
@@ -113,7 +89,7 @@ export class PlansService {
 
     try {
       return await this.plansRepository.manager.transaction(async (manager) => {
-        const [row] = await manager.query<{ id: string; createdAt: Date }[]>(
+        const [row] = await manager.query<Plan[]>(
           `INSERT INTO plans (name, duration, description, price, book_limit, editor_limit)
            VALUES ($1, make_interval(months => $2), $3, $4, $5, $6)
            RETURNING id, created_at AS "createdAt"`,
@@ -194,7 +170,7 @@ export class PlansService {
             },
           );
 
-          const plan = await selectPlanFields(
+          const plan = await selectAdminPlanFields(
             manager.createQueryBuilder(Plan, 'plan'),
           )
             .where('plan.id = :id', { id })
@@ -247,7 +223,7 @@ export class PlansService {
   async remove(
     actorId: string,
     id: string,
-    { note }: ActionNoteDto,
+    { note }: RequiredNoteDto,
   ): Promise<Record<string, never>> {
     const subscribers = await this.plansRepository.manager.transaction(
       async (manager) => {
@@ -294,7 +270,7 @@ export class PlansService {
     manager: EntityManager,
     id: string,
   ): Promise<PlanListItem> {
-    const plan = await selectPlanFields(
+    const plan = await selectAdminPlanFields(
       manager.createQueryBuilder(Plan, 'plan'),
     )
       .where('plan.id = :id', { id })

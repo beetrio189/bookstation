@@ -103,7 +103,6 @@ export class EditorsService {
     await this.manager.transaction(async (manager) => {
       const editor = await this.lockEditor(manager, id);
 
-      // providers, refresh_tokens xóa theo users (ON DELETE CASCADE)
       await manager.delete(Editor, { id });
       await manager.delete(User, { id: editor.userId });
 

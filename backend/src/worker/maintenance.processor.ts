@@ -6,12 +6,16 @@ import {
   MAINTENANCE_QUEUE,
   MaintenanceJob,
 } from '../modules/maintenance/maintenance-queue.constants';
+import { ExpiredPaymentsService } from './expired-payments.service';
 
 @Processor(MAINTENANCE_QUEUE)
 export class MaintenanceProcessor extends WorkerHost {
   private readonly logger = new Logger(MaintenanceProcessor.name);
 
-  constructor(private readonly refreshTokenService: RefreshTokenService) {
+  constructor(
+    private readonly refreshTokenService: RefreshTokenService,
+    private readonly expiredPaymentsService: ExpiredPaymentsService,
+  ) {
     super();
   }
 
@@ -19,6 +23,8 @@ export class MaintenanceProcessor extends WorkerHost {
     switch (job.name) {
       case MaintenanceJob.DELETE_EXPIRED_REFRESH_TOKENS:
         return this.deleteExpiredRefreshTokens();
+      case MaintenanceJob.SETTLE_EXPIRED_PAYMENTS:
+        return this.expiredPaymentsService.settleExpired();
       default:
         throw new Error(`Không có xử lý cho job ${job.name}`);
     }

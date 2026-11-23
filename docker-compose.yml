@@ -80,6 +80,13 @@ services:
     depends_on:
       - api
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on: [api]
+    profiles: [tunnel]
 volumes:
   postgres-data:
   redis-data:

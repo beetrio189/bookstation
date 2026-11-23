@@ -40,21 +40,23 @@ export class Payment {
   @Column({ type: 'integer' })
   price: number;
 
-  @Column({ name: 'vnp_txn_ref', type: 'varchar', length: 100 })
-  vnpTxnRef: string;
+  // Credit (VND) trừ vào giá khi mua đơn này
+  @Column({ name: 'credit_used', type: 'integer', default: 0 })
+  creditUsed: number;
 
-  // yyyyMMddHHmmss (giờ VN), cần khi tra cứu giao dịch với VNPAY
-  @Column({ name: 'vnp_create_date', type: 'char', length: 14, nullable: true })
-  vnpCreateDate: string | null;
+  // Credit (VND) hoàn lại cho NXB khi kỳ của đơn này bị cắt ngang do đổi gói
+  @Column({ name: 'credit_returned', type: 'integer', default: 0 })
+  creditReturned: number;
 
-  // Mã giao dịch phía VNPAY, điền khi nhận IPN
+  // order_invoice_number gửi SePay ("BS" + 8 ký tự [0-9A-Z]), dùng để tra đơn bên SePay;
+  // đơn trả hết bằng credit cũng có mã
   @Column({
-    name: 'vnp_transaction_no',
+    name: 'order_code',
     type: 'varchar',
-    length: 50,
-    nullable: true,
+    length: 10,
+    unique: true,
   })
-  vnpTransactionNo: string | null;
+  orderCode: string;
 
   @Column({
     type: 'enum',
@@ -70,6 +72,10 @@ export class Payment {
 
   @Column({ name: 'period_ends_at', type: 'timestamptz', nullable: true })
   periodEndsAt: Date | null;
+
+  // HMAC-SHA256 (hex) các cột tiền / kỳ, xem payment-signature.ts; ghi lại mỗi lần đổi các cột đó
+  @Column({ type: 'char', length: 64, nullable: true })
+  signature: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PagePlaceholder } from "@/components/page-placeholder";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// /publisher chưa có trang tổng quan: vào thẳng mục đầu tiên trên sidebar
 export const Route = createFileRoute("/publisher/")({
-  head: () => ({ meta: [{ title: "Nhà xuất bản | BookStation" }] }),
-  component: () => <PagePlaceholder title="Khu nhà xuất bản" />,
+  beforeLoad: () => {
+    throw redirect({ to: "/publisher/books" });
+  },
 });

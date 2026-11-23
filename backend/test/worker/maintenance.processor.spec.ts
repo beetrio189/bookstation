@@ -2,14 +2,17 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { RefreshTokenService } from '../../src/modules/auth/refresh-token.service';
 import { MaintenanceJob } from '../../src/modules/maintenance/maintenance-queue.constants';
+import { ExpiredPaymentsService } from '../../src/worker/expired-payments.service';
 import { MaintenanceProcessor } from '../../src/worker/maintenance.processor';
 
 const job = (name: string) => ({ id: '1', name }) as unknown as Job;
 
 describe('MaintenanceProcessor', () => {
   const refreshTokenService = { deleteExpired: jest.fn() };
+  const expiredPaymentsService = { settleExpired: jest.fn() };
   const processor = new MaintenanceProcessor(
     refreshTokenService as unknown as RefreshTokenService,
+    expiredPaymentsService as unknown as ExpiredPaymentsService,
   );
 
   beforeEach(() => {
@@ -23,6 +26,12 @@ describe('MaintenanceProcessor', () => {
     await processor.process(job(MaintenanceJob.DELETE_EXPIRED_REFRESH_TOKENS));
 
     expect(refreshTokenService.deleteExpired).toHaveBeenCalled();
+  });
+
+  it('settles expired payments', async () => {
+    await processor.process(job(MaintenanceJob.SETTLE_EXPIRED_PAYMENTS));
+
+    expect(expiredPaymentsService.settleExpired).toHaveBeenCalled();
   });
 
   it('throws so BullMQ retries when the database fails', async () => {

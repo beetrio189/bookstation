@@ -17,7 +17,7 @@ const VALID = {
   price: 500000,
   bookLimit: 100000,
   editorLimit: 2,
-  note: '',
+  note: 'Mở bán',
 };
 
 describe('CreatePlanDto', () => {
@@ -32,11 +32,12 @@ describe('CreatePlanDto', () => {
     ).resolves.toEqual({ ...VALID, name: 'Basic Plus 2' });
   });
 
-  it('accepts a plan without description, note, and with zero limits', async () => {
+  it('accepts a plan without description and with zero limits', async () => {
     const rest = {
       name: 'basic',
       durationMonths: 6,
       price: 500000,
+      note: 'Mở bán',
     };
 
     await expect(
@@ -73,6 +74,8 @@ describe('CreatePlanDto', () => {
     ['an editor limit over 2 billion', { editorLimit: 2_000_000_001 }],
     ['a description over 1000 characters', { description: 'a'.repeat(1001) }],
     ['a missing price', { price: undefined }],
+    ['a missing note', { note: undefined }],
+    ['a blank note', { note: '  ' }],
   ])('rejects %s', async (_label, change) => {
     await expect(body({ ...VALID, ...change })).rejects.toMatchObject({
       status: 400,
@@ -83,13 +86,16 @@ describe('CreatePlanDto', () => {
 describe('UpdatePlanDto', () => {
   it('accepts a partial body with the same rules and drops durationMonths', async () => {
     await expect(
-      body({ name: ' Pro  Max ', price: 1, durationMonths: 12 }, UpdatePlanDto),
-    ).resolves.toEqual({ name: 'Pro Max', price: 1, note: '' });
+      body(
+        { name: ' Pro  Max ', price: 1, durationMonths: 12, note: 'Đổi giá' },
+        UpdatePlanDto,
+      ),
+    ).resolves.toEqual({ name: 'Pro Max', price: 1, note: 'Đổi giá' });
   });
 
   it('accepts an empty description (clears it)', async () => {
     await expect(
-      body({ description: '  ' }, UpdatePlanDto),
+      body({ description: '  ', note: 'Bỏ mô tả' }, UpdatePlanDto),
     ).resolves.toMatchObject({ description: '' });
   });
 
@@ -98,8 +104,12 @@ describe('UpdatePlanDto', () => {
     ['a name with a dash', { name: 'a-b' }],
     ['a zero price', { price: 0 }],
     ['a negative limit', { editorLimit: -1 }],
+    ['a missing note', { price: 1, note: undefined }],
+    ['a blank note', { price: 1, note: ' ' }],
   ])('rejects %s', async (_label, value) => {
-    await expect(body(value, UpdatePlanDto)).rejects.toMatchObject({
+    await expect(
+      body({ note: 'Sửa gói', ...value }, UpdatePlanDto),
+    ).rejects.toMatchObject({
       status: 400,
     });
   });

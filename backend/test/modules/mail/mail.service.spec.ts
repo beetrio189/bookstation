@@ -346,4 +346,67 @@ describe('MailService', () => {
       expect(html).toContain('đến hết kỳ (ngày 1/5/2027)');
     });
   });
+
+  describe('sendPaymentReceiptEmail', () => {
+    const receipt = {
+      orderCode: 'BSABCD1234',
+      publisherName: 'NXB <Kim Đồng>',
+      planName: 'Pro',
+      durationMonths: 6,
+      bookLimit: 500000,
+      editorLimit: 10,
+      price: 1500000,
+      creditUsed: 150000,
+      periodStartsAt: new Date('2026-11-23T07:32:00.000Z'),
+      periodEndsAt: new Date('2027-05-23T07:32:00.000Z'),
+      oldPlanName: null,
+      oldDurationMonths: null,
+      creditReturned: null,
+    };
+
+    beforeEach(() => {
+      env.resendApiKey = 're_test';
+      send.mockResolvedValue({ data: { id: '1' }, error: null });
+    });
+
+    const sentHtml = () =>
+      (send.mock.calls[0] as [{ subject: string; html: string }])[0];
+
+    it('sends a receipt table with the total paid by bank transfer', async () => {
+      await new MailService().sendPaymentReceiptEmail(
+        'nxb@example.com',
+        receipt,
+      );
+
+      const { subject, html } = sentHtml();
+
+      expect(subject).toBe('Biên nhận thanh toán gói BookStation – BSABCD1234');
+      expect(html).toContain('<table');
+      expect(html).toContain('NXB &lt;Kim Đồng&gt;');
+      expect(html).toContain('Pro 6 tháng');
+      expect(html).toContain('− 150.000 đ');
+      expect(html).toContain('1.350.000 đ');
+      expect(html).toContain('Chuyển khoản qua SePay');
+      expect(html).toContain('14:32 23/11/2026');
+      expect(html).not.toContain('Gói cũ');
+    });
+
+    it('marks a credit-only order and mentions the plan it replaced', async () => {
+      await new MailService().sendPaymentReceiptEmail('nxb@example.com', {
+        ...receipt,
+        orderCode: 'CRABCD1234',
+        creditUsed: 1500000,
+        oldPlanName: 'Advanced',
+        oldDurationMonths: 6,
+        creditReturned: 1700000,
+      });
+
+      const { html } = sentHtml();
+
+      expect(html).toContain('Trả bằng credit');
+      expect(html).toContain(
+        'Gói cũ (Advanced 6 tháng) đã kết thúc, phần chưa dùng được hoàn 1.700.000 đ vào credit',
+      );
+    });
+  });
 });

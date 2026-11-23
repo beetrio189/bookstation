@@ -14,6 +14,7 @@ import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as PublisherRouteRouteImport } from './routes/publisher/route'
 import { Route as ReaderIndexRouteImport } from './routes/_reader/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as DevSepayRouteImport } from './routes/dev/sepay'
 import { Route as ForgotPasswordIndexRouteImport } from './routes/forgot-password/index'
 import { Route as ForgotPasswordSentRouteImport } from './routes/forgot-password/sent'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
@@ -24,9 +25,18 @@ import { Route as ResendVerificationIndexRouteImport } from './routes/resend-ver
 import { Route as ResetPasswordIndexRouteImport } from './routes/reset-password/index'
 import { Route as ResetPasswordDoneRouteImport } from './routes/reset-password/done'
 import { Route as VerifyEmailIndexRouteImport } from './routes/verify-email/index'
+import { Route as ReaderPlansIndexRouteImport } from './routes/_reader/plans/index'
 import { Route as AdminModeratorsIndexRouteImport } from './routes/admin/moderators/index'
 import { Route as AdminModeratorsIdRouteImport } from './routes/admin/moderators/$id'
+import { Route as AdminPlansIndexRouteImport } from './routes/admin/plans/index'
 import { Route as AdminPublishersIndexRouteImport } from './routes/admin/publishers/index'
+import { Route as PublisherBooksIndexRouteImport } from './routes/publisher/books/index'
+import { Route as PublisherComplaintsIndexRouteImport } from './routes/publisher/complaints/index'
+import { Route as PublisherEditorsIndexRouteImport } from './routes/publisher/editors/index'
+import { Route as PublisherPlansIndexRouteImport } from './routes/publisher/plans/index'
+import { Route as PublisherProfileIndexRouteImport } from './routes/publisher/profile/index'
+import { Route as PublisherSurveysIndexRouteImport } from './routes/publisher/surveys/index'
+import { Route as PublisherPaymentsIdRouteImport } from './routes/publisher_/payments/$id'
 import { Route as AdminPublishersIdIndexRouteImport } from './routes/admin/publishers/$id/index'
 import { Route as OauthGoogleCallbackIndexRouteImport } from './routes/oauth/google/callback/index'
 import { Route as AdminPublishersIdEditorsIndexRouteImport } from './routes/admin/publishers/$id/editors/index'
@@ -55,6 +65,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRouteRoute,
+} as any)
+const DevSepayRoute = DevSepayRouteImport.update({
+  id: '/dev/sepay',
+  path: '/dev/sepay',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordIndexRoute = ForgotPasswordIndexRouteImport.update({
   id: '/forgot-password/',
@@ -106,6 +121,11 @@ const VerifyEmailIndexRoute = VerifyEmailIndexRouteImport.update({
   path: '/verify-email/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReaderPlansIndexRoute = ReaderPlansIndexRouteImport.update({
+  id: '/plans/',
+  path: '/plans/',
+  getParentRoute: () => ReaderRouteRoute,
+} as any)
 const AdminModeratorsIndexRoute = AdminModeratorsIndexRouteImport.update({
   id: '/moderators/',
   path: '/moderators/',
@@ -116,10 +136,51 @@ const AdminModeratorsIdRoute = AdminModeratorsIdRouteImport.update({
   path: '/moderators/$id',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminPlansIndexRoute = AdminPlansIndexRouteImport.update({
+  id: '/plans/',
+  path: '/plans/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminPublishersIndexRoute = AdminPublishersIndexRouteImport.update({
   id: '/publishers/',
   path: '/publishers/',
   getParentRoute: () => AdminRouteRoute,
+} as any)
+const PublisherBooksIndexRoute = PublisherBooksIndexRouteImport.update({
+  id: '/books/',
+  path: '/books/',
+  getParentRoute: () => PublisherRouteRoute,
+} as any)
+const PublisherComplaintsIndexRoute =
+  PublisherComplaintsIndexRouteImport.update({
+    id: '/complaints/',
+    path: '/complaints/',
+    getParentRoute: () => PublisherRouteRoute,
+  } as any)
+const PublisherEditorsIndexRoute = PublisherEditorsIndexRouteImport.update({
+  id: '/editors/',
+  path: '/editors/',
+  getParentRoute: () => PublisherRouteRoute,
+} as any)
+const PublisherPlansIndexRoute = PublisherPlansIndexRouteImport.update({
+  id: '/plans/',
+  path: '/plans/',
+  getParentRoute: () => PublisherRouteRoute,
+} as any)
+const PublisherProfileIndexRoute = PublisherProfileIndexRouteImport.update({
+  id: '/profile/',
+  path: '/profile/',
+  getParentRoute: () => PublisherRouteRoute,
+} as any)
+const PublisherSurveysIndexRoute = PublisherSurveysIndexRouteImport.update({
+  id: '/surveys/',
+  path: '/surveys/',
+  getParentRoute: () => PublisherRouteRoute,
+} as any)
+const PublisherPaymentsIdRoute = PublisherPaymentsIdRouteImport.update({
+  id: '/publisher_/payments/$id',
+  path: '/publisher/payments/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminPublishersIdIndexRoute = AdminPublishersIdIndexRouteImport.update({
   id: '/publishers/$id/',
@@ -149,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/': typeof ReaderIndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/publisher': typeof PublisherRouteRouteWithChildren
+  '/dev/sepay': typeof DevSepayRoute
   '/forgot-password/sent': typeof ForgotPasswordSentRoute
   '/register/sent': typeof RegisterSentRoute
   '/reset-password/done': typeof ResetPasswordDoneRoute
@@ -161,14 +223,24 @@ export interface FileRoutesByFullPath {
   '/reset-password/': typeof ResetPasswordIndexRoute
   '/verify-email/': typeof VerifyEmailIndexRoute
   '/admin/moderators/$id': typeof AdminModeratorsIdRoute
+  '/publisher/payments/$id': typeof PublisherPaymentsIdRoute
+  '/plans/': typeof ReaderPlansIndexRoute
   '/admin/moderators/': typeof AdminModeratorsIndexRoute
+  '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/publishers/': typeof AdminPublishersIndexRoute
+  '/publisher/books/': typeof PublisherBooksIndexRoute
+  '/publisher/complaints/': typeof PublisherComplaintsIndexRoute
+  '/publisher/editors/': typeof PublisherEditorsIndexRoute
+  '/publisher/plans/': typeof PublisherPlansIndexRoute
+  '/publisher/profile/': typeof PublisherProfileIndexRoute
+  '/publisher/surveys/': typeof PublisherSurveysIndexRoute
   '/admin/publishers/$id/': typeof AdminPublishersIdIndexRoute
   '/oauth/google/callback/': typeof OauthGoogleCallbackIndexRoute
   '/admin/publishers/$id/editors/$editorId': typeof AdminPublishersIdEditorsEditorIdRoute
   '/admin/publishers/$id/editors/': typeof AdminPublishersIdEditorsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/dev/sepay': typeof DevSepayRoute
   '/forgot-password/sent': typeof ForgotPasswordSentRoute
   '/register/sent': typeof RegisterSentRoute
   '/reset-password/done': typeof ResetPasswordDoneRoute
@@ -182,8 +254,17 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordIndexRoute
   '/verify-email': typeof VerifyEmailIndexRoute
   '/admin/moderators/$id': typeof AdminModeratorsIdRoute
+  '/publisher/payments/$id': typeof PublisherPaymentsIdRoute
+  '/plans': typeof ReaderPlansIndexRoute
   '/admin/moderators': typeof AdminModeratorsIndexRoute
+  '/admin/plans': typeof AdminPlansIndexRoute
   '/admin/publishers': typeof AdminPublishersIndexRoute
+  '/publisher/books': typeof PublisherBooksIndexRoute
+  '/publisher/complaints': typeof PublisherComplaintsIndexRoute
+  '/publisher/editors': typeof PublisherEditorsIndexRoute
+  '/publisher/plans': typeof PublisherPlansIndexRoute
+  '/publisher/profile': typeof PublisherProfileIndexRoute
+  '/publisher/surveys': typeof PublisherSurveysIndexRoute
   '/admin/publishers/$id': typeof AdminPublishersIdIndexRoute
   '/oauth/google/callback': typeof OauthGoogleCallbackIndexRoute
   '/admin/publishers/$id/editors/$editorId': typeof AdminPublishersIdEditorsEditorIdRoute
@@ -194,6 +275,7 @@ export interface FileRoutesById {
   '/_reader': typeof ReaderRouteRouteWithChildren
   '/admin': typeof AdminRouteRouteWithChildren
   '/publisher': typeof PublisherRouteRouteWithChildren
+  '/dev/sepay': typeof DevSepayRoute
   '/forgot-password/sent': typeof ForgotPasswordSentRoute
   '/register/sent': typeof RegisterSentRoute
   '/reset-password/done': typeof ResetPasswordDoneRoute
@@ -207,8 +289,17 @@ export interface FileRoutesById {
   '/reset-password/': typeof ResetPasswordIndexRoute
   '/verify-email/': typeof VerifyEmailIndexRoute
   '/admin/moderators/$id': typeof AdminModeratorsIdRoute
+  '/publisher_/payments/$id': typeof PublisherPaymentsIdRoute
+  '/_reader/plans/': typeof ReaderPlansIndexRoute
   '/admin/moderators/': typeof AdminModeratorsIndexRoute
+  '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/publishers/': typeof AdminPublishersIndexRoute
+  '/publisher/books/': typeof PublisherBooksIndexRoute
+  '/publisher/complaints/': typeof PublisherComplaintsIndexRoute
+  '/publisher/editors/': typeof PublisherEditorsIndexRoute
+  '/publisher/plans/': typeof PublisherPlansIndexRoute
+  '/publisher/profile/': typeof PublisherProfileIndexRoute
+  '/publisher/surveys/': typeof PublisherSurveysIndexRoute
   '/admin/publishers/$id/': typeof AdminPublishersIdIndexRoute
   '/oauth/google/callback/': typeof OauthGoogleCallbackIndexRoute
   '/admin/publishers/$id/editors/$editorId': typeof AdminPublishersIdEditorsEditorIdRoute
@@ -220,6 +311,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/publisher'
+    | '/dev/sepay'
     | '/forgot-password/sent'
     | '/register/sent'
     | '/reset-password/done'
@@ -232,14 +324,24 @@ export interface FileRouteTypes {
     | '/reset-password/'
     | '/verify-email/'
     | '/admin/moderators/$id'
+    | '/publisher/payments/$id'
+    | '/plans/'
     | '/admin/moderators/'
+    | '/admin/plans/'
     | '/admin/publishers/'
+    | '/publisher/books/'
+    | '/publisher/complaints/'
+    | '/publisher/editors/'
+    | '/publisher/plans/'
+    | '/publisher/profile/'
+    | '/publisher/surveys/'
     | '/admin/publishers/$id/'
     | '/oauth/google/callback/'
     | '/admin/publishers/$id/editors/$editorId'
     | '/admin/publishers/$id/editors/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/dev/sepay'
     | '/forgot-password/sent'
     | '/register/sent'
     | '/reset-password/done'
@@ -253,8 +355,17 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/verify-email'
     | '/admin/moderators/$id'
+    | '/publisher/payments/$id'
+    | '/plans'
     | '/admin/moderators'
+    | '/admin/plans'
     | '/admin/publishers'
+    | '/publisher/books'
+    | '/publisher/complaints'
+    | '/publisher/editors'
+    | '/publisher/plans'
+    | '/publisher/profile'
+    | '/publisher/surveys'
     | '/admin/publishers/$id'
     | '/oauth/google/callback'
     | '/admin/publishers/$id/editors/$editorId'
@@ -264,6 +375,7 @@ export interface FileRouteTypes {
     | '/_reader'
     | '/admin'
     | '/publisher'
+    | '/dev/sepay'
     | '/forgot-password/sent'
     | '/register/sent'
     | '/reset-password/done'
@@ -277,8 +389,17 @@ export interface FileRouteTypes {
     | '/reset-password/'
     | '/verify-email/'
     | '/admin/moderators/$id'
+    | '/publisher_/payments/$id'
+    | '/_reader/plans/'
     | '/admin/moderators/'
+    | '/admin/plans/'
     | '/admin/publishers/'
+    | '/publisher/books/'
+    | '/publisher/complaints/'
+    | '/publisher/editors/'
+    | '/publisher/plans/'
+    | '/publisher/profile/'
+    | '/publisher/surveys/'
     | '/admin/publishers/$id/'
     | '/oauth/google/callback/'
     | '/admin/publishers/$id/editors/$editorId'
@@ -289,6 +410,7 @@ export interface RootRouteChildren {
   ReaderRouteRoute: typeof ReaderRouteRouteWithChildren
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
   PublisherRouteRoute: typeof PublisherRouteRouteWithChildren
+  DevSepayRoute: typeof DevSepayRoute
   ForgotPasswordSentRoute: typeof ForgotPasswordSentRoute
   RegisterSentRoute: typeof RegisterSentRoute
   ResetPasswordDoneRoute: typeof ResetPasswordDoneRoute
@@ -298,6 +420,7 @@ export interface RootRouteChildren {
   ResendVerificationIndexRoute: typeof ResendVerificationIndexRoute
   ResetPasswordIndexRoute: typeof ResetPasswordIndexRoute
   VerifyEmailIndexRoute: typeof VerifyEmailIndexRoute
+  PublisherPaymentsIdRoute: typeof PublisherPaymentsIdRoute
   OauthGoogleCallbackIndexRoute: typeof OauthGoogleCallbackIndexRoute
 }
 
@@ -337,6 +460,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRouteRoute
+    }
+    '/dev/sepay': {
+      id: '/dev/sepay'
+      path: '/dev/sepay'
+      fullPath: '/dev/sepay'
+      preLoaderRoute: typeof DevSepayRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/forgot-password/': {
       id: '/forgot-password/'
@@ -408,6 +538,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyEmailIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_reader/plans/': {
+      id: '/_reader/plans/'
+      path: '/plans'
+      fullPath: '/plans/'
+      preLoaderRoute: typeof ReaderPlansIndexRouteImport
+      parentRoute: typeof ReaderRouteRoute
+    }
     '/admin/moderators/': {
       id: '/admin/moderators/'
       path: '/moderators'
@@ -422,12 +559,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminModeratorsIdRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/plans/': {
+      id: '/admin/plans/'
+      path: '/plans'
+      fullPath: '/admin/plans/'
+      preLoaderRoute: typeof AdminPlansIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/publishers/': {
       id: '/admin/publishers/'
       path: '/publishers'
       fullPath: '/admin/publishers/'
       preLoaderRoute: typeof AdminPublishersIndexRouteImport
       parentRoute: typeof AdminRouteRoute
+    }
+    '/publisher/books/': {
+      id: '/publisher/books/'
+      path: '/books'
+      fullPath: '/publisher/books/'
+      preLoaderRoute: typeof PublisherBooksIndexRouteImport
+      parentRoute: typeof PublisherRouteRoute
+    }
+    '/publisher/complaints/': {
+      id: '/publisher/complaints/'
+      path: '/complaints'
+      fullPath: '/publisher/complaints/'
+      preLoaderRoute: typeof PublisherComplaintsIndexRouteImport
+      parentRoute: typeof PublisherRouteRoute
+    }
+    '/publisher/editors/': {
+      id: '/publisher/editors/'
+      path: '/editors'
+      fullPath: '/publisher/editors/'
+      preLoaderRoute: typeof PublisherEditorsIndexRouteImport
+      parentRoute: typeof PublisherRouteRoute
+    }
+    '/publisher/plans/': {
+      id: '/publisher/plans/'
+      path: '/plans'
+      fullPath: '/publisher/plans/'
+      preLoaderRoute: typeof PublisherPlansIndexRouteImport
+      parentRoute: typeof PublisherRouteRoute
+    }
+    '/publisher/profile/': {
+      id: '/publisher/profile/'
+      path: '/profile'
+      fullPath: '/publisher/profile/'
+      preLoaderRoute: typeof PublisherProfileIndexRouteImport
+      parentRoute: typeof PublisherRouteRoute
+    }
+    '/publisher/surveys/': {
+      id: '/publisher/surveys/'
+      path: '/surveys'
+      fullPath: '/publisher/surveys/'
+      preLoaderRoute: typeof PublisherSurveysIndexRouteImport
+      parentRoute: typeof PublisherRouteRoute
+    }
+    '/publisher_/payments/$id': {
+      id: '/publisher_/payments/$id'
+      path: '/publisher/payments/$id'
+      fullPath: '/publisher/payments/$id'
+      preLoaderRoute: typeof PublisherPaymentsIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/publishers/$id/': {
       id: '/admin/publishers/$id/'
@@ -462,10 +655,12 @@ declare module '@tanstack/react-router' {
 
 interface ReaderRouteRouteChildren {
   ReaderIndexRoute: typeof ReaderIndexRoute
+  ReaderPlansIndexRoute: typeof ReaderPlansIndexRoute
 }
 
 const ReaderRouteRouteChildren: ReaderRouteRouteChildren = {
   ReaderIndexRoute: ReaderIndexRoute,
+  ReaderPlansIndexRoute: ReaderPlansIndexRoute,
 }
 
 const ReaderRouteRouteWithChildren = ReaderRouteRoute._addFileChildren(
@@ -476,6 +671,7 @@ interface AdminRouteRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminModeratorsIdRoute: typeof AdminModeratorsIdRoute
   AdminModeratorsIndexRoute: typeof AdminModeratorsIndexRoute
+  AdminPlansIndexRoute: typeof AdminPlansIndexRoute
   AdminPublishersIndexRoute: typeof AdminPublishersIndexRoute
   AdminPublishersIdIndexRoute: typeof AdminPublishersIdIndexRoute
   AdminPublishersIdEditorsEditorIdRoute: typeof AdminPublishersIdEditorsEditorIdRoute
@@ -486,6 +682,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminModeratorsIdRoute: AdminModeratorsIdRoute,
   AdminModeratorsIndexRoute: AdminModeratorsIndexRoute,
+  AdminPlansIndexRoute: AdminPlansIndexRoute,
   AdminPublishersIndexRoute: AdminPublishersIndexRoute,
   AdminPublishersIdIndexRoute: AdminPublishersIdIndexRoute,
   AdminPublishersIdEditorsEditorIdRoute: AdminPublishersIdEditorsEditorIdRoute,
@@ -498,10 +695,22 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
 
 interface PublisherRouteRouteChildren {
   PublisherIndexRoute: typeof PublisherIndexRoute
+  PublisherBooksIndexRoute: typeof PublisherBooksIndexRoute
+  PublisherComplaintsIndexRoute: typeof PublisherComplaintsIndexRoute
+  PublisherEditorsIndexRoute: typeof PublisherEditorsIndexRoute
+  PublisherPlansIndexRoute: typeof PublisherPlansIndexRoute
+  PublisherProfileIndexRoute: typeof PublisherProfileIndexRoute
+  PublisherSurveysIndexRoute: typeof PublisherSurveysIndexRoute
 }
 
 const PublisherRouteRouteChildren: PublisherRouteRouteChildren = {
   PublisherIndexRoute: PublisherIndexRoute,
+  PublisherBooksIndexRoute: PublisherBooksIndexRoute,
+  PublisherComplaintsIndexRoute: PublisherComplaintsIndexRoute,
+  PublisherEditorsIndexRoute: PublisherEditorsIndexRoute,
+  PublisherPlansIndexRoute: PublisherPlansIndexRoute,
+  PublisherProfileIndexRoute: PublisherProfileIndexRoute,
+  PublisherSurveysIndexRoute: PublisherSurveysIndexRoute,
 }
 
 const PublisherRouteRouteWithChildren = PublisherRouteRoute._addFileChildren(
@@ -512,6 +721,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReaderRouteRoute: ReaderRouteRouteWithChildren,
   AdminRouteRoute: AdminRouteRouteWithChildren,
   PublisherRouteRoute: PublisherRouteRouteWithChildren,
+  DevSepayRoute: DevSepayRoute,
   ForgotPasswordSentRoute: ForgotPasswordSentRoute,
   RegisterSentRoute: RegisterSentRoute,
   ResetPasswordDoneRoute: ResetPasswordDoneRoute,
@@ -521,6 +731,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResendVerificationIndexRoute: ResendVerificationIndexRoute,
   ResetPasswordIndexRoute: ResetPasswordIndexRoute,
   VerifyEmailIndexRoute: VerifyEmailIndexRoute,
+  PublisherPaymentsIdRoute: PublisherPaymentsIdRoute,
   OauthGoogleCallbackIndexRoute: OauthGoogleCallbackIndexRoute,
 }
 export const routeTree = rootRouteImport

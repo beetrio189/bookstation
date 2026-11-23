@@ -12,6 +12,8 @@ export enum MailJob {
   PLAN_UPDATED = 'plan-updated',
   PLAN_UPDATED_NOTICE = 'plan-updated-notice',
   PLAN_DELETED_NOTICE = 'plan-deleted-notice',
+  PAYMENT_SETTLE_ALERT = 'payment-settle-alert',
+  PAYMENT_RECEIPT = 'payment-receipt',
 }
 
 export type AccountType = 'publisher' | 'editor' | 'moderator';
@@ -60,4 +62,15 @@ export interface PlanUpdatedNoticeJobData extends MailJobData {
 export interface PlanDeletedNoticeJobData extends MailJobData {
   planName: string;
   periodEndsAt: string;
+}
+
+export interface PaymentSettleAlertJobData extends MailJobData {
+  failingSince: string;
+  failedRuns: number;
+  overdueCount: number;
+  lastError: string;
+}
+
+export interface PaymentReceiptJobData {
+  paymentId: string;
 }

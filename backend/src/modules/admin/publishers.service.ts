@@ -486,7 +486,7 @@ export class PublishersService {
         base,
         pattern: `^${base}-[0-9]+$`,
       })
-      .getRawMany<{ slug: string }>();
+      .getRawMany<Publisher>();
 
     const publisher = await manager.save(
       manager.create(Publisher, {

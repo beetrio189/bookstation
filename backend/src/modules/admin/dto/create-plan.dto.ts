@@ -1,5 +1,5 @@
 import { IsIn, IsOptional } from 'class-validator';
-import { ActionNoteDto } from './action-note.dto';
+import { RequiredNoteDto } from './required-note.dto';
 import {
   IsPlanDescription,
   IsPlanLimit,
@@ -14,7 +14,7 @@ export { PLAN_DURATION_MONTHS };
  * Admin thêm gói trả phí. Tên gói cũng là tên hiển thị, trùng tên gói khác (kể cả
  * Free) được miễn khác thời hạn. Số phải gửi dạng number trong JSON, chuỗi "6" bị từ chối.
  */
-export class CreatePlanDto extends ActionNoteDto {
+export class CreatePlanDto extends RequiredNoteDto {
   @IsPlanName()
   name: string;
 

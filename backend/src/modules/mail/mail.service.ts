@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import escapeHtml from 'escape-html';
 import { Resend } from 'resend';
 import { env } from '../../config';
 import { AccountType, PlanSnapshot } from './mail-queue.constants';
@@ -12,13 +13,6 @@ const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   moderator: 'kiểm duyệt viên',
 };
 
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
 const formatNumber = (value: number) => value.toLocaleString('vi-VN');
 
 const formatDate = (value: Date) =>
@@ -28,6 +22,38 @@ const describePlan = ({ name, price, bookLimit, editorLimit }: PlanSnapshot) =>
   `<b>${escapeHtml(name)}</b>: tối đa ${formatNumber(bookLimit)} cuốn sách, ` +
   `${formatNumber(editorLimit)} biên tập viên, giá ` +
   (price === 0 ? 'miễn phí' : `${formatNumber(price)} đ`);
+
+export interface PaymentReceipt {
+  orderCode: string;
+  publisherName: string;
+  planName: string;
+  durationMonths: number;
+  bookLimit: number;
+  editorLimit: number;
+  price: number;
+  creditUsed: number;
+  periodStartsAt: Date;
+  periodEndsAt: Date;
+  oldPlanName: string | null;
+  oldDurationMonths: number | null;
+  creditReturned: number | null;
+}
+
+const formatDateTime = (value: Date) =>
+  value.toLocaleString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+const receiptRow = (label: string, value: string, bold = false) =>
+  `<tr>
+    <td style="padding:8px 12px;border-bottom:1px solid #e5e5e5;color:#555">${label}</td>
+    <td style="padding:8px 12px;border-bottom:1px solid #e5e5e5;text-align:right;${bold ? 'font-weight:bold;font-size:16px' : ''}">${value}</td>
+  </tr>`;
 
 interface MailMessage {
   to: string;
@@ -138,7 +164,6 @@ export class MailService {
     });
   }
 
-  // Tài khoản bị admin xóa hẳn: không còn đăng nhập được. Không kèm lý do
   async sendAccountDeletedEmail(
     to: string,
     accountType: AccountType,
@@ -245,6 +270,90 @@ export class MailService {
     });
   }
 
+  /**
+   * Biên nhận thanh toán gói cho chủ NXB (không phải hóa đơn VAT). Đơn CR… (trả hết
+   * bằng credit) cũng gửi. Đổi gói thì thêm dòng gói cũ kết thúc và credit hoàn lại.
+   */
+  async sendPaymentReceiptEmail(
+    to: string,
+    receipt: PaymentReceipt,
+  ): Promise<void> {
+    const total = receipt.price - receipt.creditUsed;
+    const plansLink = `${env.feUrl}/publisher/plans`;
+    const planName = `${escapeHtml(receipt.planName)} ${receipt.durationMonths} tháng`;
+    const method = receipt.orderCode.startsWith('CR')
+      ? 'Trả bằng credit'
+      : 'Chuyển khoản qua SePay';
+    const oldPlan = receipt.oldPlanName
+      ? `<p>Gói cũ (${escapeHtml(receipt.oldPlanName)}${
+          receipt.oldDurationMonths ? ` ${receipt.oldDurationMonths} tháng` : ''
+        }) đã kết thúc${
+          receipt.creditReturned
+            ? `, phần chưa dùng được hoàn ${formatNumber(receipt.creditReturned)} đ vào credit`
+            : ''
+        }.</p>`
+      : '';
+
+    await this.send({
+      to,
+      subject: `Biên nhận thanh toán gói BookStation – ${receipt.orderCode}`,
+      html: `
+        <p>Chào bạn,</p>
+        <p>BookStation đã nhận thanh toán gói hội viên của <b>${escapeHtml(receipt.publisherName)}</b>. Gói mới đã được kích hoạt.</p>
+        <table style="border-collapse:collapse;width:100%;max-width:560px;font-size:15px">
+          ${receiptRow('Mã đơn', receipt.orderCode)}
+          ${receiptRow('Thời gian thanh toán', formatDateTime(new Date(receipt.periodStartsAt)))}
+          ${receiptRow('Nhà xuất bản', escapeHtml(receipt.publisherName))}
+          ${receiptRow('Gói', `${planName}<br><span style="color:#777;font-size:13px">Tối đa ${formatNumber(receipt.bookLimit)} sách · ${formatNumber(receipt.editorLimit)} biên tập viên</span>`)}
+          ${receiptRow('Thời hạn', `${formatDate(new Date(receipt.periodStartsAt))} – ${formatDate(new Date(receipt.periodEndsAt))}`)}
+          ${receiptRow('Giá gốc', `${formatNumber(receipt.price)} đ`)}
+          ${receiptRow('Credit sử dụng', `− ${formatNumber(receipt.creditUsed)} đ`)}
+          ${receiptRow('Tổng thanh toán', `${formatNumber(total)} đ`, true)}
+          ${receiptRow('Hình thức', method)}
+        </table>
+        ${oldPlan}
+        <p>Xem gói hiện tại ở trang <a href="${plansLink}">Gói hội viên</a>. Nếu có thắc mắc, hãy liên hệ bookstationadmin@gmail.com.</p>
+        <p style="color:#777;font-size:13px">Đây là biên nhận thanh toán, không phải hóa đơn giá trị gia tăng.</p>
+      `,
+      devNote: `biên nhận đơn ${receipt.orderCode}: ${receipt.planName} ${receipt.durationMonths} tháng, ${total} đ`,
+    });
+  }
+
+  /**
+   * Báo admin / KDV: job chốt đơn quá hạn không chốt được đơn nào nhiều lượt liên
+   * tiếp (thường do SePay sập hoặc secret sai). Mỗi đợt lỗi chỉ gửi một lần.
+   */
+  async sendPaymentSettleAlertEmail(
+    to: string,
+    alert: {
+      failingSince: Date;
+      failedRuns: number;
+      overdueCount: number;
+      lastError: string;
+    },
+  ): Promise<void> {
+    const since = alert.failingSince.toLocaleString('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+    });
+
+    await this.send({
+      to,
+      subject: '[BookStation] Không chốt được đơn thanh toán quá hạn',
+      html: `
+        <p>Chào bạn,</p>
+        <p>Job chốt đơn thanh toán quá hạn không chốt được đơn nào trong nhiều lượt liên tiếp. Các đơn vẫn đang chờ, chưa bị đánh thất bại.</p>
+        <ul>
+          <li>Bắt đầu lỗi từ: ${since} (giờ Việt Nam)</li>
+          <li>Số lượt lỗi liên tiếp: ${alert.failedRuns}</li>
+          <li>Số đơn chờ đã quá hạn: ${formatNumber(alert.overdueCount)}</li>
+          <li>Lỗi gần nhất: ${escapeHtml(alert.lastError)}</li>
+        </ul>
+        <p>Hãy kiểm tra trạng thái SePay, SEPAY_MERCHANT_ID / SEPAY_SECRET_KEY trong .env và log của api.</p>
+      `,
+      devNote: `job chốt đơn lỗi ${alert.failedRuns} lượt liên tiếp, lỗi gần nhất: ${alert.lastError}`,
+    });
+  }
+
   private async sendCredentials(
     to: string,
     accountType: AccountType,
@@ -254,7 +363,6 @@ export class MailService {
       intro: string;
       afterLogin: string;
       notRequested: string;
-      // Ghi chú do admin/KDV nhập: escape HTML, đặt ở cuối
       reason?: string;
     },
   ): Promise<void> {

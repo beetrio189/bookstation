@@ -1,5 +1,5 @@
 import { IsOptional } from 'class-validator';
-import { ActionNoteDto } from './action-note.dto';
+import { RequiredNoteDto } from './required-note.dto';
 import {
   IsPlanDescription,
   IsPlanLimit,
@@ -12,7 +12,7 @@ import {
  * (ghim để lịch sử không lẫn); trường lạ (durationMonths…) bị bỏ. description ""
  * là xóa mô tả. Không có trường nào để sửa thì service báo NOTHING_TO_UPDATE.
  */
-export class UpdatePlanDto extends ActionNoteDto {
+export class UpdatePlanDto extends RequiredNoteDto {
   @IsPlanName()
   @IsOptional()
   name?: string;

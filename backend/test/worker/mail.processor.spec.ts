@@ -16,7 +16,10 @@ import {
   verifyPassword,
 } from '../../src/utils/password';
 import { MailProcessor } from '../../src/worker/mail.processor';
+import { NewPasswordMailService } from '../../src/worker/new-password-mail.service';
+import { PaymentReceiptService } from '../../src/worker/payment-receipt.service';
 import { PlanNoticeService } from '../../src/worker/plan-notice.service';
+import { TokenMailService } from '../../src/worker/token-mail.service';
 
 // attemptsMade = số lần đã lỗi trước lần chạy này; cấu hình thật là 3 lần
 const job = (name: string, data: MailJobData, attemptsMade = 1) =>
@@ -47,17 +50,34 @@ describe('MailProcessor', () => {
     clearLocalPasswordHash: jest.fn(),
   };
   const planNoticeService = { fanOutPlanUpdated: jest.fn() };
+  const paymentReceiptService = { send: jest.fn() };
+  // Hai service tách ra dùng thật, chỉ giả các phụ thuộc bên dưới
   const processor = new MailProcessor(
-    oneTimeTokenService as unknown as OneTimeTokenService,
     mailService as unknown as MailService,
-    usersService as unknown as UsersService,
+    new TokenMailService(
+      oneTimeTokenService as unknown as OneTimeTokenService,
+      mailService as unknown as MailService,
+    ),
+    new NewPasswordMailService(
+      mailService as unknown as MailService,
+      usersService as unknown as UsersService,
+    ),
     planNoticeService as unknown as PlanNoticeService,
+    paymentReceiptService as unknown as PaymentReceiptService,
   );
   const DATA = { userId: 'user-1', email: 'a@example.com' };
 
   beforeEach(() => {
     jest.resetAllMocks();
     oneTimeTokenService.create.mockResolvedValue('token-1');
+  });
+
+  it('sends the payment receipt of the order in the job', async () => {
+    await processor.process(
+      job(MailJob.PAYMENT_RECEIPT, { paymentId: 'pay-1' } as never),
+    );
+
+    expect(paymentReceiptService.send).toHaveBeenCalledWith('pay-1');
   });
 
   it('creates a 24h token and sends the verification email', async () => {

@@ -27,6 +27,8 @@ export function BoxedInput({
         htmlFor={id}
         className={cn(
           "flex items-center gap-3 rounded-[20px] border-2 border-foreground px-5 py-2.5 focus-within:border-primary",
+          // Ô không sửa được (Figma "Gói / Sửa"): viền nhạt, nền xám
+          "has-disabled:border-foreground/15 has-disabled:bg-foreground/4",
           error && "border-[#ff6d6d] focus-within:border-[#ff6d6d]",
         )}
       >
@@ -37,7 +39,7 @@ export function BoxedInput({
             aria-invalid={error ? true : undefined}
             aria-describedby={note ? `${id}-note` : undefined}
             className={cn(
-              "bg-transparent text-lg/[1.3] font-medium outline-none placeholder:text-foreground/45",
+              "bg-transparent text-lg/[1.3] font-medium outline-none placeholder:text-foreground/45 disabled:text-foreground/60",
               className,
             )}
             {...props}

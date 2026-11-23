@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { Logo } from "@/components/logo";
 import { ReaderHeader } from "@/components/reader/reader-header";
 import { guardArea } from "@/lib/session";
@@ -21,7 +21,7 @@ function ReaderLayout() {
   );
 }
 
-// Các trang trong footer chưa có, tạm để chữ
+// Các trang trong footer chưa có thì tạm để chữ; "Dành cho nhà xuất bản" mở trang gói công khai
 function ReaderFooter() {
   return (
     <footer className="mt-12 bg-white md:mt-20">
@@ -41,7 +41,11 @@ function ReaderFooter() {
             <ul className="flex gap-4 text-sm font-semibold md:flex-col md:text-lg md:font-medium">
               <li>Giới thiệu</li>
               <li>Liên hệ</li>
-              <li>Dành cho nhà xuất bản</li>
+              <li>
+                <Link to="/plans" className="hover:underline">
+                  Dành cho nhà xuất bản
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

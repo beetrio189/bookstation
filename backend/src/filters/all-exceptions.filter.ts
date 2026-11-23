@@ -40,7 +40,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (exception instanceof AppException) {
       response.status(exception.getStatus()).json({
-        error: { code: exception.code, message: exception.message },
+        error: {
+          code: exception.code,
+          message: exception.message,
+          ...(exception.details && { details: exception.details }),
+        },
       });
       return;
     }

@@ -1,7 +1,8 @@
 import { EntityManager } from 'typeorm';
 import { UserStatus } from '../../utils/enums/user-status.enum';
 
-const ACTIVE_PERIOD = `pm.status = 'success'
+/** Payment (alias pm) đang trong kỳ. */
+export const ACTIVE_PERIOD = `pm.status = 'success'
   AND pm.period_starts_at <= now() AND pm.period_ends_at > now()`;
 
 export interface PlanSubscriber {

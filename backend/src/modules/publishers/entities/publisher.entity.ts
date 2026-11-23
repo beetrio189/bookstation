@@ -27,6 +27,10 @@ export class Publisher {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
+  // Credit (VND) còn lại từ phần chưa dùng của các kỳ bị cắt khi đổi gói, trừ vào lần mua sau
+  @Column({ name: 'credit_balance', type: 'integer', default: 0 })
+  creditBalance: number;
+
   // Cột generated trong DB: f_unaccent(publisher_name), có index GIN trigram
   @Column({
     name: 'search_text',

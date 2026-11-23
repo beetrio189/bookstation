@@ -9,6 +9,8 @@ import {
   MailJob,
   MailJobData,
   PasswordChangedJobData,
+  PaymentReceiptJobData,
+  PaymentSettleAlertJobData,
   PlanDeletedNoticeJobData,
   PlanUpdatedJobData,
   PlanUpdatedNoticeJobData,
@@ -19,7 +21,9 @@ import {
 export class MailQueueService {
   constructor(
     @InjectQueue(MAIL_QUEUE)
-    private readonly queue: Queue<MailJobData | PlanUpdatedJobData>,
+    private readonly queue: Queue<
+      MailJobData | PlanUpdatedJobData | PaymentReceiptJobData
+    >,
   ) {}
 
   async enqueueVerificationEmail(userId: string, email: string): Promise<void> {
@@ -109,5 +113,20 @@ export class MailQueueService {
     await this.queue.addBulk(
       notices.map((data) => ({ name: MailJob.PLAN_DELETED_NOTICE, data })),
     );
+  }
+
+  async enqueuePaymentSettleAlerts(
+    alerts: PaymentSettleAlertJobData[],
+  ): Promise<void> {
+    await this.queue.addBulk(
+      alerts.map((data) => ({ name: MailJob.PAYMENT_SETTLE_ALERT, data })),
+    );
+  }
+
+  /** Gọi sau khi transaction xác nhận đơn đã commit (worker đọc lại đơn từ DB) */
+  async enqueuePaymentReceipt(paymentId: string): Promise<void> {
+    const data: PaymentReceiptJobData = { paymentId };
+
+    await this.queue.add(MailJob.PAYMENT_RECEIPT, data);
   }
 }
