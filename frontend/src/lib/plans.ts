@@ -57,6 +57,8 @@ export const PLAN_DURATION_MONTHS = [6, 12, 24] as const;
 export const PLAN_NAME_MAX_LENGTH = 50;
 export const PLAN_DESCRIPTION_MAX_LENGTH = 1000;
 export const PLAN_NUMBER_MAX = 2_000_000_000;
+// Khớp MIN_PAYMENT_AMOUNT backend: SePay không nhận thanh toán dưới 1.000 đ
+export const PLAN_PRICE_MIN = 1000;
 
 // Mã lỗi backend (backend/src/utils/errors/errors.ts)
 export const PLAN_ERROR_CODES = {
@@ -82,7 +84,9 @@ export const formatPrice = (price: number) =>
   price === 0 ? "Miễn phí" : `${formatNumber(price)} đ`;
 
 export const durationLabel = (plan: Pick<PlanItem, "durationMonths">) =>
-  plan.durationMonths === undefined ? "Mặc định" : `${plan.durationMonths} tháng`;
+  plan.durationMonths === undefined
+    ? "Mặc định"
+    : `${plan.durationMonths} tháng`;
 
 // Tên kèm thời hạn, dùng trong tiêu đề hộp thoại và toast: "Basic (6 tháng)"
 export const planTitle = (plan: PlanItem) =>

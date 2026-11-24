@@ -48,7 +48,10 @@ function PlanCard({
         <button
           type="button"
           onClick={onEdit}
-          className={cn(SMALL_BUTTON, "border-foreground hover:bg-foreground/5")}
+          className={cn(
+            SMALL_BUTTON,
+            "border-foreground hover:bg-foreground/5",
+          )}
         >
           Sửa
         </button>

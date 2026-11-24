@@ -1,5 +1,6 @@
 import { applyDecorators } from '@nestjs/common';
 import { Transform } from 'class-transformer';
+import { MIN_PAYMENT_AMOUNT } from '../../subscriptions/payment-quote';
 import {
   IsInt,
   IsNotEmpty,
@@ -43,7 +44,10 @@ export const IsPlanDescription = () =>
 export const IsPlanPrice = () =>
   applyDecorators(
     Max(MAX_INT, { message: 'Giá quá lớn' }),
-    Min(1, { message: 'Giá phải lớn hơn 0' }),
+    // SePay không nhận thanh toán dưới mức này
+    Min(MIN_PAYMENT_AMOUNT, {
+      message: `Giá tối thiểu là ${MIN_PAYMENT_AMOUNT.toLocaleString('vi-VN')} đ`,
+    }),
     IsInt({ message: 'Giá phải là số nguyên' }),
   );
 

@@ -69,6 +69,7 @@ describe('CreatePlanDto', () => {
     ['months as a string', { durationMonths: '6' }],
     ['missing months', { durationMonths: undefined }],
     ['a free paid plan', { price: 0 }],
+    ['a price under 1.000 đ (SePay minimum)', { price: 999 }],
     ['a price over 2 billion', { price: 2_000_000_001 }],
     ['a negative book limit', { bookLimit: -1 }],
     ['an editor limit over 2 billion', { editorLimit: 2_000_000_001 }],
@@ -87,10 +88,15 @@ describe('UpdatePlanDto', () => {
   it('accepts a partial body with the same rules and drops durationMonths', async () => {
     await expect(
       body(
-        { name: ' Pro  Max ', price: 1, durationMonths: 12, note: 'Đổi giá' },
+        {
+          name: ' Pro  Max ',
+          price: 1000,
+          durationMonths: 12,
+          note: 'Đổi giá',
+        },
         UpdatePlanDto,
       ),
-    ).resolves.toEqual({ name: 'Pro Max', price: 1, note: 'Đổi giá' });
+    ).resolves.toEqual({ name: 'Pro Max', price: 1000, note: 'Đổi giá' });
   });
 
   it('accepts an empty description (clears it)', async () => {
@@ -103,9 +109,10 @@ describe('UpdatePlanDto', () => {
     ['a blank name', { name: ' ' }],
     ['a name with a dash', { name: 'a-b' }],
     ['a zero price', { price: 0 }],
+    ['a price under 1.000 đ', { price: 999 }],
     ['a negative limit', { editorLimit: -1 }],
-    ['a missing note', { price: 1, note: undefined }],
-    ['a blank note', { price: 1, note: ' ' }],
+    ['a missing note', { price: 1000, note: undefined }],
+    ['a blank note', { price: 1000, note: ' ' }],
   ])('rejects %s', async (_label, value) => {
     await expect(
       body({ note: 'Sửa gói', ...value }, UpdatePlanDto),

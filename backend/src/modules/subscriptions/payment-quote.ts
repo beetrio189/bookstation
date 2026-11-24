@@ -5,6 +5,12 @@ import { FREE_PLAN_DURATION } from './entities/plan.entity';
 import { durationMonthsSql } from './plan-query';
 import { ACTIVE_PERIOD } from './plan-subscribers';
 
+/**
+ * Số tiền nhỏ nhất SePay cho thanh toán (VND). Tổng phải trả chỉ được là 0 (trả hết
+ * bằng credit) hoặc từ mức này trở lên; giá gói tối thiểu cũng bằng mức này.
+ */
+export const MIN_PAYMENT_AMOUNT = 1000;
+
 /** Số tiền (VND) khi NXB mua một gói ngay lúc này */
 export interface PaymentQuote {
   price: number;
@@ -127,12 +133,20 @@ export async function quotePayment(
   return (await loadPurchase(manager, userId, planId)).quote;
 }
 
+/**
+ * Dùng tối đa credit đang có. Nếu sau đó còn phải trả nhưng dưới MIN_PAYMENT_AMOUNT
+ * thì dùng bớt credit để trả đúng MIN_PAYMENT_AMOUNT (phần credit chưa dùng vẫn giữ).
+ */
 export function calculateQuote(
   price: number,
   creditBalance: number,
   creditReturned: number,
 ): PaymentQuote {
-  const creditUsed = Math.min(price, creditBalance + creditReturned);
+  let creditUsed = Math.min(price, creditBalance + creditReturned);
+
+  if (price - creditUsed > 0 && price - creditUsed < MIN_PAYMENT_AMOUNT) {
+    creditUsed = Math.max(0, price - MIN_PAYMENT_AMOUNT);
+  }
 
   return {
     price,

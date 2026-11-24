@@ -27,6 +27,12 @@ describe('payment quote', () => {
     [300000, 50000, 100000, 150000, 150000],
     [100000, 50000, 100000, 100000, 0],
     [100000, 0, 0, 0, 100000],
+    // Còn phải trả 300 đ (< 1.000): dùng bớt credit để trả đúng 1.000 đ
+    [500000, 499700, 0, 499000, 1000],
+    // Còn đúng 1.000 đ: giữ nguyên
+    [500000, 499000, 0, 499000, 1000],
+    // Credit đủ trả hết: vẫn 0 đ (đơn CR…)
+    [500000, 499900, 100, 500000, 0],
   ])(
     'price %i, balance %i, returned %i → used %i, total %i',
     (price, balance, returned, used, total) => {

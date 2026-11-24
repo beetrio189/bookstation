@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { api, ApiError, isSystemError } from "@/lib/api";
 import {
   durationLabel,
+  formatNumber,
   formatPrice,
   isFreePlan,
   isValidPlanName,
@@ -17,6 +18,7 @@ import {
   PLAN_ERROR_CODES,
   PLAN_NAME_MAX_LENGTH,
   PLAN_NUMBER_MAX,
+  PLAN_PRICE_MIN,
   planTitle,
   type PlanItem,
 } from "@/lib/plans";
@@ -55,7 +57,9 @@ const checkNumber = (value: string, label: string, min: number) => {
   const number = Number(value);
 
   if (number < min) {
-    return min > 0 ? `${label} phải lớn hơn 0` : `${label} không được âm`;
+    return min > 0
+      ? `${label} tối thiểu là ${formatNumber(min)} đ`
+      : `${label} không được âm`;
   }
 
   return number > PLAN_NUMBER_MAX ? `${label} quá lớn` : undefined;
@@ -69,7 +73,9 @@ function validate(values: Values, isFree: boolean): Errors {
       : !isValidPlanName(name)
         ? "Tên gói chỉ gồm chữ cái không dấu, chữ số và dấu cách"
         : undefined,
-    price: isFree ? undefined : checkNumber(values.price, "Giá", 1),
+    price: isFree
+      ? undefined
+      : checkNumber(values.price, "Giá", PLAN_PRICE_MIN),
     bookLimit: checkNumber(values.bookLimit, "Số sách tối đa", 0),
     editorLimit: checkNumber(values.editorLimit, "Số biên tập viên tối đa", 0),
     note: values.note.trim() ? undefined : "Vui lòng nhập ghi chú",
@@ -110,7 +116,11 @@ export function PlanFormDialog({
         ? event.target.value.replace(/\D/g, "")
         : event.target.value;
       setValues((current) => ({ ...current, [field]: value }));
-      setErrors((current) => ({ ...current, [field]: undefined, form: undefined }));
+      setErrors((current) => ({
+        ...current,
+        [field]: undefined,
+        form: undefined,
+      }));
     };
 
   const initial = toValues(plan);
@@ -120,8 +130,11 @@ export function PlanFormDialog({
   // Chỉ các trường đã đổi (sửa); thêm thì gửi đủ
   const changes = {
     ...(name !== initial.name && { name }),
-    ...(!isFree && values.price !== initial.price && { price: Number(values.price) }),
-    ...(values.bookLimit !== initial.bookLimit && { bookLimit: Number(values.bookLimit) }),
+    ...(!isFree &&
+      values.price !== initial.price && { price: Number(values.price) }),
+    ...(values.bookLimit !== initial.bookLimit && {
+      bookLimit: Number(values.bookLimit),
+    }),
     ...(values.editorLimit !== initial.editorLimit && {
       editorLimit: Number(values.editorLimit),
     }),
