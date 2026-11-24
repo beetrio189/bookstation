@@ -12,10 +12,6 @@ export interface PublisherPlan extends PublicPlan {
 export class PublisherPlansService {
   constructor(private readonly dataSource: DataSource) {}
 
-  /**
-   * Giống GET /subscription-plans (cùng cột, cùng thứ tự) cộng thêm canBuy cho
-   * NXB mà user này là chủ. Một câu SQL nên mức đã dùng và các gói đọc cùng lúc.
-   */
   async listPlans(userId: string): Promise<{ items: PublisherPlan[] }> {
     const items = await this.dataSource.query<PublisherPlan[]>(
       `SELECT plan.id, plan.name, plan.description, plan.price,
@@ -39,7 +35,6 @@ export class PublisherPlansService {
     return { items };
   }
 
-  /** Số tiền nếu mua gói này ngay bây giờ, cho màn xác nhận trước khi thanh toán */
   quote(userId: string, planId: string): Promise<PaymentQuote> {
     return quotePayment(this.dataSource.manager, userId, planId);
   }

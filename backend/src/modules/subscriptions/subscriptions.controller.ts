@@ -2,7 +2,7 @@ import { Controller, Get, Header } from '@nestjs/common';
 import { Public } from '../../decorators/public.decorator';
 import { SubscriptionsService } from './subscriptions.service';
 
-@Controller('subscription-plans')
+@Controller('plans')
 export class SubscriptionsController {
   constructor(private readonly subscriptionsService: SubscriptionsService) {}
 

@@ -12,7 +12,7 @@ export interface PlanItem {
   updatedAt: string;
 }
 
-// Khớp GET /api/subscription-plans (không có createdAt / updatedAt)
+// Khớp GET /api/plans (không có createdAt / updatedAt)
 export type PublicPlan = Omit<PlanItem, "createdAt" | "updatedAt">;
 
 // Khớp GET /api/publisher/plans

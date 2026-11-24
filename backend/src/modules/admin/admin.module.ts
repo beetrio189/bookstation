@@ -17,7 +17,6 @@ import { PlansService } from './plans.service';
 import { PublishersController } from './publishers.controller';
 import { PublishersService } from './publishers.service';
 
-// Các API quản trị: /api/admin/*
 @Module({
   imports: [
     TypeOrmModule.forFeature([

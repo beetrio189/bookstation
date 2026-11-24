@@ -123,7 +123,6 @@ export class MailQueueService {
     );
   }
 
-  /** Gọi sau khi transaction xác nhận đơn đã commit (worker đọc lại đơn từ DB) */
   async enqueuePaymentReceipt(paymentId: string): Promise<void> {
     const data: PaymentReceiptJobData = { paymentId };
 

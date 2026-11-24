@@ -28,7 +28,7 @@ function PublicPlans() {
   const [selected, setSelected] = useState<DurationKey | null>(null);
 
   useEffect(() => {
-    api<{ items: PublicPlan[] }>("/subscription-plans")
+    api<{ items: PublicPlan[] }>("/plans")
       .then(({ items }) => setItems(items))
       .catch(() => setItems([]));
   }, []);
