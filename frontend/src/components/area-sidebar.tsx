@@ -47,11 +47,11 @@ function AreaNav({ home, label, items }: AreaNavProps) {
 
 const PANEL_CLASS = "flex w-75 shrink-0 flex-col gap-2 px-6 py-10";
 
-// Màn rộng (từ lg): sidebar cố định bên trái
+// Màn rộng (từ lg): sidebar cố định bên trái, đứng yên khi cuộn trang
 export function AreaSidebar(props: AreaNavProps) {
   return (
     <aside
-      className={`${PANEL_CLASS} hidden border-r-2 border-foreground lg:flex`}
+      className={`${PANEL_CLASS} sticky top-0 hidden h-screen self-start overflow-y-auto border-r-2 border-foreground lg:flex`}
     >
       <AreaNav {...props} />
     </aside>

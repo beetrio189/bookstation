@@ -14,7 +14,7 @@ import { Roles } from '../../decorators/roles.decorator';
 import { RoleCode } from '../../utils/enums/role-code.enum';
 import type { AuthUser } from '../../utils/types/auth-user';
 import { CreatePublisherDto } from './dto/create-publisher.dto';
-import { ListPublishersQuery } from './dto/list-publishers.query';
+import { SearchPageQuery } from '../../utils/dto/search-page.query';
 import { RequiredNoteDto } from './dto/required-note.dto';
 import { PublishersService } from './publishers.service';
 
@@ -30,7 +30,7 @@ export class PublishersController {
   }
 
   @Get()
-  list(@Query() query: ListPublishersQuery) {
+  list(@Query() query: SearchPageQuery) {
     return this.publishersService.list(query);
   }
 

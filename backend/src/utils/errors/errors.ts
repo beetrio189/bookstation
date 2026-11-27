@@ -7,7 +7,7 @@ export interface ErrorDefinition {
 }
 
 /**
- * 1xxx: lỗi chung, 2xxx: tài khoản, 3xxx: quản trị, 4xxx: mua gói / thanh toán. Module mới dùng dải tiếp theo.
+ * 1xxx: lỗi chung, 2xxx: tài khoản, 3xxx: quản trị, 4xxx: mua gói / thanh toán, 5xxx: sách. Module mới dùng dải tiếp theo.
  *
  * Quy ước với FE: phân loại lỗi theo `status`, không theo dải `code`.
  * - 429, 5xx (và khi không có response): lỗi hệ thống. FE hiện toast góc
@@ -157,6 +157,19 @@ export const ERRORS = {
     status: HttpStatus.CONFLICT,
     message: 'Không được xóa gói Free',
   },
+  // Trùng tên (không phân biệt hoa thường, dấu) hoặc trùng slug
+  GENRE_ALREADY_EXISTS: {
+    code: 3008,
+    status: HttpStatus.CONFLICT,
+    message: 'Thể loại đã tồn tại',
+  },
+  // Số biên tập viên đã bằng editor_limit của gói hiện tại (kể cả vừa hạ gói)
+  EDITOR_LIMIT_REACHED: {
+    code: 3009,
+    status: HttpStatus.CONFLICT,
+    message:
+      'Đã đạt số biên tập viên tối đa của gói hiện tại, hãy nâng gói để thêm biên tập viên',
+  },
 
   PLAN_NOT_PURCHASABLE: {
     code: 4000,
@@ -192,5 +205,30 @@ export const ERRORS = {
     code: 4006,
     status: HttpStatus.CONFLICT,
     message: 'Bạn đã thanh toán gói này rồi!',
+  },
+
+  // 5xxx: sách. Số sách đã bằng book_limit của gói hiện tại (kể cả vừa hạ gói)
+  BOOK_LIMIT_REACHED: {
+    code: 5000,
+    status: HttpStatus.CONFLICT,
+    message:
+      'Đã đạt giới hạn số sách của gói hiện tại, hãy nâng gói để thêm sách',
+  },
+  GENRE_NOT_FOUND: {
+    code: 5001,
+    status: HttpStatus.BAD_REQUEST,
+    message: 'Có thể loại không tồn tại, hãy tải lại danh sách thể loại',
+  },
+  // public_id không do BE cấp cho NXB này, đã dùng hoặc đã quá 1 giờ
+  INVALID_COVER: {
+    code: 5002,
+    status: HttpStatus.BAD_REQUEST,
+    message: 'Ảnh bìa không hợp lệ hoặc đã hết hạn, hãy tải ảnh lên lại',
+  },
+  // Hai request cùng lúc sinh trùng slug (DB báo unique)
+  BOOK_SLUG_CONFLICT: {
+    code: 5003,
+    status: HttpStatus.CONFLICT,
+    message: 'Đường dẫn sách vừa bị trùng, hãy thử lưu lại',
   },
 } as const satisfies Record<string, ErrorDefinition>;

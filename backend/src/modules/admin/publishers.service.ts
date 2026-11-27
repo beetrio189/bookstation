@@ -12,6 +12,7 @@ import { SystemActionType } from '../../utils/enums/system-action-type.enum';
 import { UserStatus } from '../../utils/enums/user-status.enum';
 import { AppException } from '../../utils/errors/app.exception';
 import { ERRORS } from '../../utils/errors/errors';
+import { escapeLike } from '../../utils/escape-like';
 import { nextFreeSlug, slugify } from '../../utils/slug';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { MailJob } from '../mail/mail-queue.constants';
@@ -26,7 +27,7 @@ import {
 import { Provider } from '../users/entities/provider.entity';
 import { User } from '../users/entities/user.entity';
 import { CreatePublisherDto } from './dto/create-publisher.dto';
-import { ListPublishersQuery } from './dto/list-publishers.query';
+import { SearchPageQuery } from '../../utils/dto/search-page.query';
 import { PasswordResetQuota } from './password-reset-quota';
 import { writeSystemLog } from './write-system-log';
 
@@ -101,8 +102,6 @@ const CURRENT_PAYMENT_SQL = `SELECT {col} FROM payments pm
     AND pm.period_starts_at <= now() AND pm.period_ends_at > now()
   ORDER BY pm.period_ends_at DESC LIMIT 1`;
 
-const escapeLike = (value: string) => value.replace(/[\\%_]/g, '\\$&');
-
 @Injectable()
 export class PublishersService {
   private readonly logger = new Logger(PublishersService.name);
@@ -164,7 +163,7 @@ export class PublishersService {
     };
   }
 
-  async list({ page, limit, q }: ListPublishersQuery): Promise<PublisherPage> {
+  async list({ page, limit, q }: SearchPageQuery): Promise<PublisherPage> {
     const query = this.manager
       .createQueryBuilder(Publisher, 'publisher')
       .innerJoin(User, 'user', 'user.id = publisher.user_id')

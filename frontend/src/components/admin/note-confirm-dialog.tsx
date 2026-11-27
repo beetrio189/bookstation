@@ -11,7 +11,7 @@ const SERVICE_UNAVAILABLE_STATUS = 503;
 const NOTE_MAX_LENGTH = 1000;
 
 /**
- * Hộp thoại xác nhận có ô "Lý do" bắt buộc (Figma "NXB / Xác nhận …", "BTV / Xác nhận …").
+ * Hộp thoại xác nhận có ô "Lý do" (mặc định bắt buộc) (Figma "NXB / Xác nhận …", "BTV / Xác nhận …").
  * `submit` gọi API với `silent: true`; lỗi được xử lý ở đây:
  * - 404: đối tượng đã bị xóa trong lúc xem → `onGone`
  * - 503 (chưa đẩy được email): báo ngay trong hộp, bấm Thử lại
@@ -26,6 +26,7 @@ export function NoteConfirmDialog({
   placeholder,
   confirmLabel,
   kind = "primary",
+  noteOptional = false,
   submit,
   onDone,
   onGone,
@@ -37,6 +38,8 @@ export function NoteConfirmDialog({
   placeholder: string;
   confirmLabel: string;
   kind?: "primary" | "danger";
+  // Lý do không bắt buộc (Figma "Thể loại / Xác nhận xóa")
+  noteOptional?: boolean;
   submit: (note: string) => Promise<unknown>;
   onDone: () => void;
   onGone: () => void;
@@ -61,7 +64,7 @@ export function NoteConfirmDialog({
     event.preventDefault();
     const trimmed = note.trim();
 
-    if (!trimmed) {
+    if (!trimmed && !noteOptional) {
       setNoteError("Vui lòng nhập lý do");
       return;
     }
@@ -109,7 +112,7 @@ export function NoteConfirmDialog({
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
         <BoxedTextarea
           id={`${id}-note`}
-          label="Lý do"
+          label={noteOptional ? "Lý do (không bắt buộc)" : "Lý do"}
           placeholder={placeholder}
           maxLength={NOTE_MAX_LENGTH}
           value={note}

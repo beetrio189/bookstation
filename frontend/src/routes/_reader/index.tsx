@@ -51,10 +51,10 @@ function Section({
 function BookRow({ books }: { books: BookSummary[] }) {
   return (
     // Chừa chỗ dưới cho bóng của bìa sách khỏi bị cắt.
-    // Nút cuộn nằm giữa ảnh bìa: bìa cao 258px (md) / 321px (xl)
+    // Nút cuộn nằm giữa ảnh bìa: bìa cao 264px (md) / 300px (xl)
     <ScrollRow
       className={cn(SCROLL_ROW, "gap-3.5 pb-3 md:gap-6 xl:gap-8")}
-      arrowClassName="md:top-[129px] xl:top-[160px]"
+      arrowClassName="md:top-[132px] xl:top-[150px]"
     >
       {books.map((book) => (
         <BookCard key={book.id} book={book} />

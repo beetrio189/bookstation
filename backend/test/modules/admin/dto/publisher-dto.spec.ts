@@ -1,7 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { validationExceptionFactory } from '../../../../src/utils/errors/validation-exception.factory';
 import { CreatePublisherDto } from '../../../../src/modules/admin/dto/create-publisher.dto';
-import { ListPublishersQuery } from '../../../../src/modules/admin/dto/list-publishers.query';
+import { SearchPageQuery } from '../../../../src/utils/dto/search-page.query';
 import { RequiredNoteDto } from '../../../../src/modules/admin/dto/required-note.dto';
 
 const pipe = new ValidationPipe({
@@ -12,7 +12,7 @@ const pipe = new ValidationPipe({
 const body = (metatype: new () => object, value: unknown) =>
   pipe.transform(value, { type: 'body', metatype });
 const query = (value: object) =>
-  pipe.transform(value, { type: 'query', metatype: ListPublishersQuery });
+  pipe.transform(value, { type: 'query', metatype: SearchPageQuery });
 const VALID = {
   email: 'nxb@example.com',
   publisherName: 'Kim Đồng',

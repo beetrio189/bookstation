@@ -15,6 +15,7 @@ import { ResponseInterceptor } from '../interceptors/response.interceptor';
 import { BULLMQ_ROOT_OPTIONS } from '../libs/bullmq.config';
 import dataSource from '../libs/typeorm.config';
 import { AdminModule } from './admin/admin.module';
+import { GenresModule } from './genres/genres.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthCheckModule } from './health-check/health-check.module';
 import { PublishersModule } from './publishers/publishers.module';
@@ -50,6 +51,7 @@ import { UsersModule } from './users/users.module';
     AdminModule,
     SubscriptionsModule,
     PublishersModule,
+    GenresModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

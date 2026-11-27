@@ -51,6 +51,13 @@ export function getRole(): Role | null {
   return typeof role === "string" && role in AREA_OF ? (role as Role) : null;
 }
 
+// users.id của người đang đăng nhập (claim sub)
+export function getUserId(): string | null {
+  const sub = readTokenPayload()?.sub;
+
+  return typeof sub === "string" ? sub : null;
+}
+
 /**
  * Tài khoản có đăng nhập bằng email + mật khẩu (provider "local") không. Tài khoản
  * chỉ đăng nhập Google thì không có mật khẩu để đổi, ẩn mục "Đổi mật khẩu".

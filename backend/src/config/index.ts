@@ -22,6 +22,9 @@ const envSchema = z
     GOOGLE_CLIENT_SECRET: z.string().min(1),
     GOOGLE_REDIRECT_URI: z.url().optional(),
     PWNED_PASSWORD_THRESHOLD: z.coerce.number().int().min(0).default(10),
+    CLOUDINARY_CLOUD_NAME: z.string().min(1),
+    CLOUDINARY_API_KEY: z.string().min(1),
+    CLOUDINARY_API_SECRET: z.string().min(1),
   })
   .superRefine((value, context) => {
     if (value.RESEND_API_KEY && !value.MAIL_FROM) {
@@ -76,6 +79,9 @@ export const env = {
   googleClientId: parsed.data.GOOGLE_CLIENT_ID,
   googleClientSecret: parsed.data.GOOGLE_CLIENT_SECRET,
   pwnedPasswordThreshold: parsed.data.PWNED_PASSWORD_THRESHOLD,
+  cloudinaryCloudName: parsed.data.CLOUDINARY_CLOUD_NAME,
+  cloudinaryApiKey: parsed.data.CLOUDINARY_API_KEY,
+  cloudinaryApiSecret: parsed.data.CLOUDINARY_API_SECRET,
   googleRedirectUri:
     parsed.data.GOOGLE_REDIRECT_URI ??
     `http://localhost:${parsed.data.PORT}/api/auth/google/callback`,

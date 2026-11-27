@@ -6,6 +6,7 @@ import dataSource from '../libs/typeorm.config';
 import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
 import { OneTimeTokenService } from '../modules/auth/one-time-token.service';
 import { RefreshTokenService } from '../modules/auth/refresh-token.service';
+import { CoverQueueModule } from '../modules/books/cover-queue.module';
 import { MailQueueModule } from '../modules/mail/mail-queue.module';
 import { MailModule } from '../modules/mail/mail.module';
 import { MaintenanceQueueModule } from '../modules/maintenance/maintenance-queue.module';
@@ -13,6 +14,7 @@ import { RedisModule } from '../modules/redis/redis.module';
 import { Provider } from '../modules/users/entities/provider.entity';
 import { User } from '../modules/users/entities/user.entity';
 import { UsersService } from '../modules/users/users.service';
+import { CoverProcessor } from './cover.processor';
 import { ExpiredPaymentsService } from './expired-payments.service';
 import { MailProcessor } from './mail.processor';
 import { MaintenanceProcessor } from './maintenance.processor';
@@ -30,11 +32,13 @@ import { TokenMailService } from './token-mail.service';
     MailModule,
     MailQueueModule,
     MaintenanceQueueModule,
+    CoverQueueModule,
   ],
   providers: [
     MailProcessor,
     OneTimeTokenService,
     MaintenanceProcessor,
+    CoverProcessor,
     RefreshTokenService,
     UsersService,
     PlanNoticeService,

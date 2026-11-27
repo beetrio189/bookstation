@@ -1,3 +1,4 @@
+import { NormalizeText } from '../../../decorators/normalize-text.decorator';
 import { applyDecorators } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import { MIN_PAYMENT_AMOUNT } from '../../subscriptions/payment-quote';
@@ -21,9 +22,7 @@ export const PLAN_DURATION_MONTHS = [6, 12, 24];
  */
 export const IsPlanName = () =>
   applyDecorators(
-    Transform(({ value }: { value: unknown }) =>
-      typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value,
-    ),
+    NormalizeText(),
     Matches(/^[a-zA-Z0-9 ]+$/, {
       message: 'Tên gói chỉ gồm chữ cái không dấu, chữ số và dấu cách',
     }),

@@ -1,4 +1,4 @@
-import { Building2, Package, ShieldCheck } from "lucide-react";
+import { Building2, Package, ShieldCheck, Tags } from "lucide-react";
 import {
   AreaMobileNav,
   AreaSidebar,
@@ -13,6 +13,7 @@ const NAV: (AreaNavItem & {
   { to: "/admin/publishers", label: "Nhà xuất bản", icon: Building2 },
   { to: "/admin/moderators", label: "Kiểm duyệt viên", icon: ShieldCheck },
   { to: "/admin/plans", label: "Gói hội viên", icon: Package, adminOnly: true },
+  { to: "/admin/genres", label: "Thể loại", icon: Tags },
 ];
 
 function navProps() {

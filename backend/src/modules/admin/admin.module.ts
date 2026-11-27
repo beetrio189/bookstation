@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { GenresModule } from '../genres/genres.module';
 import { MailQueueModule } from '../mail/mail-queue.module';
 import { Editor } from '../publishers/entities/editor.entity';
 import { Publisher } from '../publishers/entities/publisher.entity';
@@ -10,6 +11,7 @@ import { Provider } from '../users/entities/provider.entity';
 import { User } from '../users/entities/user.entity';
 import { EditorsController } from './editors.controller';
 import { EditorsService } from './editors.service';
+import { AdminGenresController } from './genres.controller';
 import { ModeratorsController } from './moderators.controller';
 import { ModeratorsService } from './moderators.service';
 import { PlansController } from './plans.controller';
@@ -29,12 +31,14 @@ import { PublishersService } from './publishers.service';
       Plan,
     ]),
     MailQueueModule,
+    GenresModule,
   ],
   controllers: [
     ModeratorsController,
     PublishersController,
     EditorsController,
     PlansController,
+    AdminGenresController,
   ],
   providers: [
     ModeratorsService,

@@ -31,7 +31,7 @@ export function RatingLine({
   );
 }
 
-// Ảnh bìa tỉ lệ 219×321 như Figma; chưa có ảnh hoặc ảnh lỗi thì hiện bìa mặc định
+// Ảnh bìa tỉ lệ 2:3 như Figma (200×300); chưa có ảnh hoặc ảnh lỗi thì hiện bìa mặc định
 export function BookCover({
   book,
   className,
@@ -42,7 +42,7 @@ export function BookCover({
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src = book.coverUrl;
   const base = cn(
-    "aspect-[219/321] w-full rounded-[10px] shadow-[0_4px_20px_rgba(0,0,0,0.18)]",
+    "aspect-[2/3] w-full rounded-[10px] shadow-[0_4px_20px_rgba(0,0,0,0.18)]",
     className,
   );
 
@@ -73,7 +73,7 @@ export function BookCover({
 // Thẻ sách trên trang chủ (Figma "Trang chủ (mới)"): bìa, tên tối đa 2 dòng, tác giả, đánh giá
 export function BookCard({ book }: { book: BookSummary }) {
   return (
-    <article className="flex w-31 shrink-0 snap-start flex-col gap-2 md:w-44 xl:w-[219px] xl:gap-5">
+    <article className="flex w-31 shrink-0 snap-start flex-col gap-2 md:w-44 xl:w-50 xl:gap-5">
       <BookCover book={book} />
       <div className="flex flex-col gap-0.5 xl:gap-1">
         <h3
