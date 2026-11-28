@@ -8,12 +8,17 @@ export interface PlanItem {
   price: number;
   bookLimit: number;
   editorLimit: number;
+  // Trọng số lên hàng "Sách mới từ NXB …" (chỉ admin thấy)
+  featuredWeight: number;
   createdAt: string;
   updatedAt: string;
 }
 
-// Khớp GET /api/plans (không có createdAt / updatedAt)
-export type PublicPlan = Omit<PlanItem, "createdAt" | "updatedAt">;
+// Khớp GET /api/plans (không có createdAt / updatedAt / featuredWeight)
+export type PublicPlan = Omit<
+  PlanItem,
+  "createdAt" | "updatedAt" | "featuredWeight"
+>;
 
 // Khớp GET /api/publisher/plans
 export interface PublisherPlan extends PublicPlan {
@@ -57,15 +62,16 @@ export const PLAN_DURATION_MONTHS = [6, 12, 24] as const;
 export const PLAN_NAME_MAX_LENGTH = 50;
 export const PLAN_DESCRIPTION_MAX_LENGTH = 1000;
 export const PLAN_NUMBER_MAX = 2_000_000_000;
+export const PLAN_WEIGHT_MAX = 1000;
 // Khớp MIN_PAYMENT_AMOUNT backend: SePay không nhận thanh toán dưới 1.000 đ
 export const PLAN_PRICE_MIN = 1000;
 
 // Mã lỗi backend (backend/src/utils/errors/errors.ts)
 export const PLAN_ERROR_CODES = {
-  NOTHING_TO_UPDATE: 1007,
   PLAN_ALREADY_EXISTS: 3004,
   FREE_PLAN_PRICE_LOCKED: 3006,
   FREE_PLAN_NOT_DELETABLE: 3007,
+  PLAN_PRICE_TOO_LOW: 3010,
 } as const;
 
 export const isFreePlan = (plan: Pick<PlanItem, "durationMonths">) =>

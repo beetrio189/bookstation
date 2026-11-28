@@ -52,10 +52,7 @@ export class GenresService {
   ) {}
 
   /** Lọc tên chứa q (không phân biệt dấu), chỉ xếp theo tên; withStats cho trang quản trị */
-  async list(
-    { page, limit, q }: SearchPageQuery,
-    withStats = false,
-  ): Promise<GenrePage> {
+  async list(params: SearchPageQuery, withStats = false): Promise<GenrePage> {
     const query = this.genresRepository
       .createQueryBuilder('genre')
       .select('genre.id', 'id')
@@ -71,9 +68,9 @@ export class GenresService {
         .addSelect('genre.created_at', 'createdAt');
     }
 
-    if (q) {
+    if (params.q) {
       query.where('f_unaccent(genre.name) ILIKE f_unaccent(:like)', {
-        like: `%${escapeLike(q)}%`,
+        like: `%${escapeLike(params.q)}%`,
       });
     }
 
@@ -81,39 +78,36 @@ export class GenresService {
     const items = await query
       .orderBy('genre.name', 'ASC')
       .addOrderBy('genre.id', 'ASC')
-      .offset((page - 1) * limit)
-      .limit(limit)
+      .offset((params.page - 1) * params.limit)
+      .limit(params.limit)
       .getRawMany<GenreItem>();
 
     return {
       items,
-      page,
-      limit,
+      page: params.page,
+      limit: params.limit,
       total,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / params.limit),
     };
   }
 
   /** Slug sinh từ tên; trùng tên (bỏ hoa thường, dấu) hoặc slug → 409 do DB báo */
-  async create(
-    actorId: string,
-    { name, note }: GenreFieldsDto,
-  ): Promise<GenreCreated> {
+  async create(actorId: string, dto: GenreFieldsDto): Promise<GenreCreated> {
     try {
       const genre = await this.genresRepository.manager.transaction(
         async (manager) => {
           const created = await manager.save(
             manager.create(Genre, {
-              name,
-              slug: await this.freeSlug(manager, name),
+              name: dto.name,
+              slug: await this.freeSlug(manager, dto.name),
             }),
           );
 
           await writeSystemLog(manager, actorId, {
             actionType: SystemActionType.GENRE_CREATION,
             targetId: created.id,
-            targetName: name,
-            note,
+            targetName: dto.name,
+            note: dto.note,
           });
 
           return created;
@@ -139,26 +133,26 @@ export class GenresService {
   async update(
     actorId: string,
     id: string,
-    { name, note }: GenreFieldsDto,
+    dto: GenreFieldsDto,
   ): Promise<GenreUpdated> {
     try {
       const genre = await this.genresRepository.manager.transaction(
         async (manager) => {
           const current = await this.lockGenre(manager, id);
 
-          if (current.name === name) {
+          if (current.name === dto.name) {
             return current;
           }
 
-          current.name = name;
-          current.slug = await this.freeSlug(manager, name, id);
+          current.name = dto.name;
+          current.slug = await this.freeSlug(manager, dto.name, id);
           const saved = await manager.save(current);
 
           await writeSystemLog(manager, actorId, {
             actionType: SystemActionType.GENRE_UPDATE,
             targetId: id,
-            targetName: name,
-            note,
+            targetName: dto.name,
+            note: dto.note,
           });
 
           return saved;

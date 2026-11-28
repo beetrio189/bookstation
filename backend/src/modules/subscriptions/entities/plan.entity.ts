@@ -31,6 +31,10 @@ export class Plan {
   @Column({ name: 'editor_limit', type: 'integer' })
   editorLimit: number;
 
+  // Trọng số lên hàng "Sách mới từ NXB …" (càng cao càng hay được chọn)
+  @Column({ name: 'featured_weight', type: 'integer', default: 1 })
+  featuredWeight: number;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

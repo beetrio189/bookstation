@@ -15,6 +15,7 @@ const DTO = {
   price: 500000,
   bookLimit: 100000,
   editorLimit: 2,
+  featuredWeight: 1,
   note: 'Mở bán',
 };
 
@@ -27,6 +28,7 @@ const PAID = {
   price: 500000,
   bookLimit: 100000,
   editorLimit: 2,
+  featuredWeight: 1,
   createdAt: CREATED_AT,
   updatedAt: CREATED_AT,
 };
@@ -58,6 +60,8 @@ describe('PlansService', () => {
   }
   const manager = {
     query: jest.fn(),
+    create: jest.fn((_entity: unknown, values: object) => values),
+    save: jest.fn(),
     findOneOrFail: jest.fn(),
     insert: jest.fn(),
     update: jest.fn(),
@@ -80,16 +84,17 @@ describe('PlansService', () => {
     mailQueueService as unknown as MailQueueService,
   );
 
-  // INSERT ... RETURNING
+  // save() trả lại entity kèm cột DB sinh ra
   const mockInsert = () =>
-    manager.query.mockResolvedValueOnce([
-      { id: 'plan-1', createdAt: CREATED_AT },
-    ]);
+    manager.save.mockImplementationOnce((plan: object) =>
+      Promise.resolve({ ...plan, id: 'plan-1', createdAt: CREATED_AT }),
+    );
 
   beforeEach(() => {
     jest.clearAllMocks();
     queryBuilder.getRawOne.mockReset();
     manager.query.mockReset();
+    manager.save.mockReset();
     manager.update.mockReset();
     manager.findOneOrFail.mockResolvedValue({ name: 'Quản trị viên' });
     mailQueueService.enqueuePlanUpdated.mockResolvedValue(undefined);
@@ -102,7 +107,7 @@ describe('PlansService', () => {
       .mockResolvedValueOnce(before)
       .mockResolvedValueOnce(after);
 
-  it('inserts with make_interval, logs, and returns the plan', async () => {
+  it('saves the plan with an interval duration, logs, and returns it', async () => {
     mockInsert();
 
     await expect(service.create(ADMIN_ID, DTO)).resolves.toEqual({
@@ -113,15 +118,20 @@ describe('PlansService', () => {
       price: 500000,
       bookLimit: 100000,
       editorLimit: 2,
+      featuredWeight: 1,
       createdAt: CREATED_AT,
     });
 
-    // Chỉ một câu INSERT: không còn khóa / so hạn mức theo tên
-    expect(manager.query).toHaveBeenCalledTimes(1);
-    expect(manager.query).toHaveBeenCalledWith(
-      expect.stringContaining('make_interval(months => $2)'),
-      ['basic', 6, 'Cho NXB nhỏ', 500000, 100000, 2],
-    );
+    expect(manager.save).toHaveBeenCalledTimes(1);
+    expect(manager.create).toHaveBeenCalledWith(Plan, {
+      name: 'basic',
+      duration: '6 months',
+      description: 'Cho NXB nhỏ',
+      price: 500000,
+      bookLimit: 100000,
+      editorLimit: 2,
+      featuredWeight: 1,
+    });
     expect(manager.insert).toHaveBeenCalledWith(SystemLog, {
       actorId: ADMIN_ID,
       actorName: 'Quản trị viên',
@@ -138,18 +148,26 @@ describe('PlansService', () => {
     await expect(
       service.create(ADMIN_ID, { ...DTO, description: '' }),
     ).resolves.toMatchObject({ description: null });
-    expect(manager.query).toHaveBeenCalledWith(expect.any(String), [
-      'basic',
-      6,
-      null,
-      500000,
-      100000,
-      2,
-    ]);
+    expect(manager.create).toHaveBeenCalledWith(
+      Plan,
+      expect.objectContaining({ description: null }),
+    );
+  });
+
+  it('stores the featured weight sent by the admin', async () => {
+    mockInsert();
+
+    await expect(
+      service.create(ADMIN_ID, { ...DTO, featuredWeight: 5 }),
+    ).resolves.toMatchObject({ featuredWeight: 5 });
+    expect(manager.create).toHaveBeenCalledWith(
+      Plan,
+      expect.objectContaining({ featuredWeight: 5 }),
+    );
   });
 
   it('maps a duplicate (name, duration) to PLAN_ALREADY_EXISTS', async () => {
-    manager.query.mockRejectedValueOnce(
+    manager.save.mockRejectedValueOnce(
       new QueryFailedError('INSERT', [], {
         code: '23505',
       } as unknown as Error),
@@ -162,7 +180,7 @@ describe('PlansService', () => {
 
   it('rethrows other database errors', async () => {
     const failure = new Error('connection lost');
-    manager.query.mockRejectedValueOnce(failure);
+    manager.save.mockRejectedValueOnce(failure);
 
     await expect(service.create(ADMIN_ID, DTO)).rejects.toBe(failure);
   });
@@ -187,11 +205,30 @@ describe('PlansService', () => {
   });
 
   describe('update', () => {
-    it('updates only the sent fields, logs plan_update, and queues the notice when the price changes', async () => {
+    // Body PUT đủ trường, khớp PAID
+    const PUT = {
+      name: 'basic',
+      description: 'Cho NXB nhỏ',
+      price: 500000,
+      bookLimit: 100000,
+      editorLimit: 2,
+      featuredWeight: 1,
+      note: 'Sửa gói',
+    };
+    const FREE_PUT = {
+      ...PUT,
+      name: 'Free',
+      price: 0,
+      bookLimit: 0,
+      editorLimit: 0,
+    };
+
+    it('replaces every field, logs plan_update, and queues the notice when the price changes', async () => {
       mockPlanReads(PAID, { ...PAID, name: 'Basic Plus', price: 600000 });
 
       await expect(
         service.update(ADMIN_ID, 'plan-1', {
+          ...PUT,
           name: 'Basic Plus',
           price: 600000,
           note: 'Tăng giá',
@@ -202,7 +239,14 @@ describe('PlansService', () => {
       expect(manager.update).toHaveBeenCalledWith(
         Plan,
         { id: 'plan-1' },
-        { name: 'Basic Plus', price: 600000 },
+        {
+          name: 'Basic Plus',
+          description: 'Cho NXB nhỏ',
+          price: 600000,
+          bookLimit: 100000,
+          editorLimit: 2,
+          featuredWeight: 1,
+        },
       );
       expect(manager.insert).toHaveBeenCalledWith(SystemLog, {
         actorId: ADMIN_ID,
@@ -217,36 +261,39 @@ describe('PlansService', () => {
       );
     });
 
-    it('does not email when only the name or description changes', async () => {
-      mockPlanReads(PAID, { ...PAID, name: 'Co ban', description: null });
+    it('stores a missing description as NULL and does not email for it', async () => {
+      mockPlanReads(PAID, { ...PAID, description: null });
 
       await service.update(ADMIN_ID, 'plan-1', {
-        name: 'Co ban',
-        description: '',
-        note: '',
+        ...PUT,
+        description: undefined,
       });
 
-      // Mô tả rỗng lưu NULL
       expect(manager.update).toHaveBeenCalledWith(
         Plan,
         { id: 'plan-1' },
-        { name: 'Co ban', description: null },
+        expect.objectContaining({ description: null }),
       );
       expect(mailQueueService.enqueuePlanUpdated).not.toHaveBeenCalled();
     });
 
-    it('does not email when a limit is sent with the same value', async () => {
-      mockPlanReads(PAID, PAID);
+    it('returns the plan without updating or logging when nothing changed', async () => {
+      queryBuilder.getRawOne.mockResolvedValueOnce(PAID);
 
-      await service.update(ADMIN_ID, 'plan-1', { bookLimit: 100000, note: '' });
+      await expect(service.update(ADMIN_ID, 'plan-1', PUT)).resolves.toBe(PAID);
 
+      expect(manager.update).not.toHaveBeenCalled();
+      expect(manager.insert).not.toHaveBeenCalled();
       expect(mailQueueService.enqueuePlanUpdated).not.toHaveBeenCalled();
     });
 
-    it('lets the Free plan change its limits, logged as forever', async () => {
+    it('lets the Free plan change its limits at 0 đ, logged as forever', async () => {
       mockPlanReads(FREE, { ...FREE, bookLimit: 10 });
 
-      await service.update(ADMIN_ID, 'plan-free', { bookLimit: 10, note: '' });
+      await service.update(ADMIN_ID, 'plan-free', {
+        ...FREE_PUT,
+        bookLimit: 10,
+      });
 
       expect(manager.insert).toHaveBeenCalledWith(
         SystemLog,
@@ -257,27 +304,32 @@ describe('PlansService', () => {
       );
     });
 
-    it('refuses a price on the Free plan', async () => {
+    it('refuses a price above 0 đ on the Free plan', async () => {
       queryBuilder.getRawOne.mockResolvedValueOnce(FREE);
 
       await expect(
-        service.update(ADMIN_ID, 'plan-free', { price: 1, note: '' }),
+        service.update(ADMIN_ID, 'plan-free', { ...FREE_PUT, price: 1 }),
       ).rejects.toMatchObject({ code: 3006 });
       expect(manager.update).not.toHaveBeenCalled();
     });
 
-    it('refuses a body with nothing to update before touching the database', async () => {
-      await expect(
-        service.update(ADMIN_ID, 'plan-1', { note: 'chỉ có note' }),
-      ).rejects.toMatchObject({ code: 1007 });
-      expect(manager.transaction).not.toHaveBeenCalled();
-    });
+    it.each([0, 999])(
+      'refuses a price of %i đ on a paid plan (SePay minimum)',
+      async (price) => {
+        queryBuilder.getRawOne.mockResolvedValueOnce(PAID);
+
+        await expect(
+          service.update(ADMIN_ID, 'plan-1', { ...PUT, price }),
+        ).rejects.toMatchObject({ code: 3010 });
+        expect(manager.update).not.toHaveBeenCalled();
+      },
+    );
 
     it('returns 404 for an unknown plan', async () => {
       queryBuilder.getRawOne.mockResolvedValueOnce(undefined);
 
       await expect(
-        service.update(ADMIN_ID, 'plan-x', { price: 1, note: '' }),
+        service.update(ADMIN_ID, 'plan-x', PUT),
       ).rejects.toMatchObject({ code: 1003 });
     });
 
@@ -290,20 +342,20 @@ describe('PlansService', () => {
       );
 
       await expect(
-        service.update(ADMIN_ID, 'plan-1', { name: 'pro', note: '' }),
+        service.update(ADMIN_ID, 'plan-1', { ...PUT, name: 'pro' }),
       ).rejects.toMatchObject({ code: 3004 });
     });
 
     it('still returns the plan when the notice cannot be queued', async () => {
       jest.spyOn(Logger.prototype, 'error').mockImplementation();
-      mockPlanReads(PAID, { ...PAID, price: 1 });
+      mockPlanReads(PAID, { ...PAID, price: 1000 });
       mailQueueService.enqueuePlanUpdated.mockRejectedValueOnce(
         new Error('Redis down'),
       );
 
       await expect(
-        service.update(ADMIN_ID, 'plan-1', { price: 1, note: '' }),
-      ).resolves.toMatchObject({ price: 1 });
+        service.update(ADMIN_ID, 'plan-1', { ...PUT, price: 1000 }),
+      ).resolves.toMatchObject({ price: 1000 });
     });
   });
 

@@ -49,6 +49,7 @@ describe('PublisherPaymentsService', () => {
       durationMonths: 6,
       bookLimit: 500,
       editorLimit: 10,
+      featuredWeight: 3,
     },
     quote: {
       price: 600000,

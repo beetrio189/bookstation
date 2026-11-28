@@ -20,7 +20,7 @@ export interface PublisherPage {
 export interface PublisherDetail extends PublisherListItem {
   userId: string;
   email: string;
-  logoUrl?: string;
+  logoPublicId?: string;
   description?: string;
   // Tên gói hiện tại (plans.name, cũng là tên hiển thị): "Free", "basic"…
   subscriptionTier?: string;

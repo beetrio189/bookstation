@@ -6,6 +6,7 @@ import { SystemActionType } from '../../utils/enums/system-action-type.enum';
 import { AppException } from '../../utils/errors/app.exception';
 import { ERRORS } from '../../utils/errors/errors';
 import { MailQueueService } from '../mail/mail-queue.service';
+import { MIN_PAYMENT_AMOUNT } from '../subscriptions/payment-quote';
 import { Plan } from '../subscriptions/entities/plan.entity';
 import {
   findPlanSubscribers,
@@ -25,19 +26,29 @@ export interface PlanCreated {
   price: number;
   bookLimit: number;
   editorLimit: number;
+  featuredWeight: number;
   createdAt: Date;
 }
 
 export interface PlanListItem extends PublicPlan {
+  featuredWeight: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const NOTIFIED_FIELDS = ['price', 'bookLimit', 'editorLimit'] as const;
+const EDITABLE_FIELDS = [
+  'name',
+  'description',
+  'price',
+  'bookLimit',
+  'editorLimit',
+  'featuredWeight',
+] as const;
 
-/** Cột của một gói cho admin: cột công khai + mốc thời gian. */
 const selectAdminPlanFields = (query: SelectQueryBuilder<Plan>) =>
   selectPlanFields(query)
+    .addSelect('plan.featured_weight', 'featuredWeight')
     .addSelect('plan.created_at', 'createdAt')
     .addSelect('plan.updated_at', 'updatedAt');
 
@@ -73,51 +84,39 @@ export class PlansService {
    * UNIQUE (name, duration) trong DB (kể cả request song song); tên và hạn mức
    * giữa các gói cùng tên không cần khớp nhau.
    */
-  async create(
-    actorId: string,
-    {
-      name,
-      durationMonths,
-      description,
-      price,
-      bookLimit,
-      editorLimit,
-      note,
-    }: CreatePlanDto,
-  ): Promise<PlanCreated> {
-    const savedDescription = description || null;
+  async create(actorId: string, dto: CreatePlanDto): Promise<PlanCreated> {
+    const savedDescription = dto.description || null;
 
     try {
       return await this.plansRepository.manager.transaction(async (manager) => {
-        const [row] = await manager.query<Plan[]>(
-          `INSERT INTO plans (name, duration, description, price, book_limit, editor_limit)
-           VALUES ($1, make_interval(months => $2), $3, $4, $5, $6)
-           RETURNING id, created_at AS "createdAt"`,
-          [
-            name,
-            durationMonths,
-            savedDescription,
-            price,
-            bookLimit,
-            editorLimit,
-          ],
+        const row = await manager.save(
+          manager.create(Plan, {
+            name: dto.name,
+            duration: `${dto.durationMonths} months`,
+            description: savedDescription,
+            price: dto.price,
+            bookLimit: dto.bookLimit,
+            editorLimit: dto.editorLimit,
+            featuredWeight: dto.featuredWeight,
+          }),
         );
 
         await writeSystemLog(manager, actorId, {
           actionType: SystemActionType.PLAN_CREATION,
           targetId: row.id,
-          targetName: `${name} (${durationMonths} tháng)`,
-          note,
+          targetName: `${dto.name} (${dto.durationMonths} tháng)`,
+          note: dto.note,
         });
 
         return {
           id: row.id,
-          name,
-          durationMonths,
+          name: dto.name,
+          durationMonths: dto.durationMonths,
           description: savedDescription,
-          price,
-          bookLimit,
-          editorLimit,
+          price: dto.price,
+          bookLimit: dto.bookLimit,
+          editorLimit: dto.editorLimit,
+          featuredWeight: dto.featuredWeight,
           createdAt: row.createdAt,
         };
       });
@@ -131,22 +130,24 @@ export class PlansService {
   }
 
   /**
-   * Sửa gói trong một transaction (khóa dòng, UPDATE, log). Gói Free không đổi
-   * giá. Sau commit, nếu giá hoặc hạn mức thật sự đổi thì đẩy job báo NXB; đẩy
-   * lỗi chỉ ghi log vì gói đã sửa xong.
+   * Sửa gói (PUT) trong một transaction (khóa dòng, UPDATE, log). Giá kiểm theo
+   * loại gói: Free phải 0 đ, trả phí ≥ MIN_PAYMENT_AMOUNT. Không đổi gì thì trả
+   * gói luôn, không ghi log. Sau commit, nếu giá hoặc hạn mức thật sự đổi thì
+   * đẩy job báo NXB; đẩy lỗi chỉ ghi log vì gói đã sửa xong.
    */
   async update(
     actorId: string,
     id: string,
-    { note, ...fields }: UpdatePlanDto,
+    dto: UpdatePlanDto,
   ): Promise<PlanListItem> {
-    const changes = Object.fromEntries(
-      Object.entries(fields).filter(([, value]) => value !== undefined),
-    ) as Partial<Omit<UpdatePlanDto, 'note'>>;
-
-    if (Object.keys(changes).length === 0) {
-      throw new AppException(ERRORS.NOTHING_TO_UPDATE);
-    }
+    const values = {
+      name: dto.name,
+      description: dto.description || null,
+      price: dto.price,
+      bookLimit: dto.bookLimit,
+      editorLimit: dto.editorLimit,
+      featuredWeight: dto.featuredWeight,
+    };
 
     let result: { plan: PlanListItem; notify: boolean };
 
@@ -155,20 +156,19 @@ export class PlansService {
         async (manager) => {
           const before = await this.lockPlan(manager, id);
 
-          if (before.durationMonths === null && changes.price !== undefined) {
-            throw new AppException(ERRORS.FREE_PLAN_PRICE_LOCKED);
+          if (before.durationMonths === null) {
+            if (values.price > 0) {
+              throw new AppException(ERRORS.FREE_PLAN_PRICE_LOCKED);
+            }
+          } else if (values.price < MIN_PAYMENT_AMOUNT) {
+            throw new AppException(ERRORS.PLAN_PRICE_TOO_LOW);
           }
 
-          await manager.update(
-            Plan,
-            { id },
-            {
-              ...changes,
-              ...(changes.description !== undefined && {
-                description: changes.description || null,
-              }),
-            },
-          );
+          if ( EDITABLE_FIELDS.every((field) => values[field] === before[field] )) {
+            return { plan: before, notify: false };
+          }
+
+          await manager.update(Plan, { id }, values);
 
           const plan = await selectAdminPlanFields(
             manager.createQueryBuilder(Plan, 'plan'),
@@ -184,7 +184,7 @@ export class PlansService {
             actionType: SystemActionType.PLAN_UPDATE,
             targetId: id,
             targetName: logName(plan),
-            note,
+            note: dto.note,
           });
 
           return {
@@ -223,7 +223,7 @@ export class PlansService {
   async remove(
     actorId: string,
     id: string,
-    { note }: RequiredNoteDto,
+    dto: RequiredNoteDto,
   ): Promise<Record<string, never>> {
     const subscribers = await this.plansRepository.manager.transaction(
       async (manager) => {
@@ -241,7 +241,7 @@ export class PlansService {
           actionType: SystemActionType.PLAN_DELETION,
           targetId: id,
           targetName: logName(plan),
-          note,
+          note: dto.note,
         });
 
         return found;

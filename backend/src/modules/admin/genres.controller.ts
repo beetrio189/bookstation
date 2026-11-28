@@ -4,8 +4,8 @@ import {
   Delete,
   Get,
   Header,
-  Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { CurrentUser } from '../../decorators/current-user.decorator';
@@ -34,7 +34,7 @@ export class AdminGenresController {
     return this.genresService.create(user.id, dto);
   }
 
-  @Patch(':id')
+  @Put(':id')
   @Header('Cache-Control', 'no-store')
   update(
     @CurrentUser() user: AuthUser,
@@ -48,8 +48,8 @@ export class AdminGenresController {
   remove(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: ActionNoteDto,
+    @Body() dto: ActionNoteDto,
   ) {
-    return this.genresService.remove(user.id, id, note);
+    return this.genresService.remove(user.id, id, dto.note);
   }
 }

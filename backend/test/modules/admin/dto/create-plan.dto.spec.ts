@@ -17,6 +17,7 @@ const VALID = {
   price: 500000,
   bookLimit: 100000,
   editorLimit: 2,
+  featuredWeight: 3,
   note: 'Mở bán',
 };
 
@@ -37,6 +38,7 @@ describe('CreatePlanDto', () => {
       name: 'basic',
       durationMonths: 6,
       price: 500000,
+      featuredWeight: 1,
       note: 'Mở bán',
     };
 
@@ -75,6 +77,11 @@ describe('CreatePlanDto', () => {
     ['an editor limit over 2 billion', { editorLimit: 2_000_000_001 }],
     ['a description over 1000 characters', { description: 'a'.repeat(1001) }],
     ['a missing price', { price: undefined }],
+    ['a missing featured weight', { featuredWeight: undefined }],
+    ['a featured weight of 0', { featuredWeight: 0 }],
+    ['a featured weight over 1000', { featuredWeight: 1001 }],
+    ['a decimal featured weight', { featuredWeight: 1.5 }],
+    ['a featured weight as a string', { featuredWeight: '3' }],
     ['a missing note', { note: undefined }],
     ['a blank note', { note: '  ' }],
   ])('rejects %s', async (_label, change) => {
@@ -85,39 +92,62 @@ describe('CreatePlanDto', () => {
 });
 
 describe('UpdatePlanDto', () => {
-  it('accepts a partial body with the same rules and drops durationMonths', async () => {
+  const PUT = {
+    name: 'Basic',
+    price: 500000,
+    bookLimit: 100000,
+    editorLimit: 2,
+    featuredWeight: 3,
+    note: 'Sửa gói',
+  };
+
+  it('accepts a full body with the same rules and drops durationMonths', async () => {
     await expect(
-      body(
-        {
-          name: ' Pro  Max ',
-          price: 1000,
-          durationMonths: 12,
-          note: 'Đổi giá',
-        },
-        UpdatePlanDto,
-      ),
-    ).resolves.toEqual({ name: 'Pro Max', price: 1000, note: 'Đổi giá' });
+      body({ ...PUT, name: ' Pro  Max ', durationMonths: 12 }, UpdatePlanDto),
+    ).resolves.toEqual({ ...PUT, name: 'Pro Max' });
+  });
+
+  it('accepts a 0 đ price (the service checks it against the plan type)', async () => {
+    await expect(
+      body({ ...PUT, price: 0 }, UpdatePlanDto),
+    ).resolves.toMatchObject({ price: 0 });
   });
 
   it('accepts an empty description (clears it)', async () => {
     await expect(
-      body({ description: '  ', note: 'Bỏ mô tả' }, UpdatePlanDto),
+      body({ ...PUT, description: '  ' }, UpdatePlanDto),
     ).resolves.toMatchObject({ description: '' });
   });
 
   it.each([
     ['a blank name', { name: ' ' }],
     ['a name with a dash', { name: 'a-b' }],
-    ['a zero price', { price: 0 }],
-    ['a price under 1.000 đ', { price: 999 }],
+    ['a negative price', { price: -1 }],
+    ['a decimal price', { price: 1.5 }],
     ['a negative limit', { editorLimit: -1 }],
-    ['a missing note', { price: 1000, note: undefined }],
-    ['a blank note', { price: 1000, note: ' ' }],
+    ['a missing name', { name: undefined }],
+    ['a missing price', { price: undefined }],
+    ['a missing book limit', { bookLimit: undefined }],
+    ['a missing editor limit', { editorLimit: undefined }],
+    ['a missing featured weight', { featuredWeight: undefined }],
+    ['a missing note', { note: undefined }],
+    ['a blank note', { note: ' ' }],
   ])('rejects %s', async (_label, value) => {
     await expect(
-      body({ note: 'Sửa gói', ...value }, UpdatePlanDto),
-    ).rejects.toMatchObject({
-      status: 400,
+      body({ ...PUT, ...value }, UpdatePlanDto),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe('featured weight messages', () => {
+  it.each([
+    [undefined, 'Vui lòng nhập trọng số'],
+    [1.5, 'Trọng số phải là số nguyên'],
+    [0, 'Trọng số tối thiểu là 1'],
+    [1001, 'Trọng số tối đa là 1000'],
+  ])('%p → %s', async (featuredWeight, message) => {
+    await expect(body({ ...VALID, featuredWeight })).rejects.toMatchObject({
+      message,
     });
   });
 });

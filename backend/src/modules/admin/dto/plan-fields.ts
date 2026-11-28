@@ -3,6 +3,7 @@ import { applyDecorators } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import { MIN_PAYMENT_AMOUNT } from '../../subscriptions/payment-quote';
 import {
+  IsDefined,
   IsInt,
   IsNotEmpty,
   IsString,
@@ -48,6 +49,20 @@ export const IsPlanPrice = () =>
       message: `Giá tối thiểu là ${MIN_PAYMENT_AMOUNT.toLocaleString('vi-VN')} đ`,
     }),
     IsInt({ message: 'Giá phải là số nguyên' }),
+  );
+
+// Trọng số lên hàng "Sách mới từ NXB …": số nguyên 1–1000
+export const PLAN_WEIGHT_MAX = 1000;
+
+// Câu báo lỗi lấy theo validator khai báo đầu tiên: kiểm "đã nhập" và "số nguyên" trước
+export const IsPlanWeight = () =>
+  applyDecorators(
+    IsDefined({ message: 'Vui lòng nhập trọng số' }),
+    IsInt({ message: 'Trọng số phải là số nguyên' }),
+    Min(1, { message: 'Trọng số tối thiểu là 1' }),
+    Max(PLAN_WEIGHT_MAX, {
+      message: `Trọng số tối đa là ${PLAN_WEIGHT_MAX}`,
+    }),
   );
 
 export const IsPlanLimit = (label: string) =>

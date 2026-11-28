@@ -62,7 +62,7 @@ export class ModeratorsService {
    */
   async create(
     actorId: string,
-    { email, name, note }: CreateModeratorDto,
+    dto: CreateModeratorDto,
   ): Promise<ModeratorView> {
     let user: User;
 
@@ -71,7 +71,7 @@ export class ModeratorsService {
         if (
           await manager.existsBy(Provider, {
             provider: IdentityProvider.LOCAL,
-            providerKey: email,
+            providerKey: dto.email,
           })
         ) {
           throw new AppException(ERRORS.EMAIL_ALREADY_EXISTS);
@@ -80,8 +80,8 @@ export class ModeratorsService {
         const created = await manager.save(
           manager.create(User, {
             role: RoleCode.MODERATOR,
-            name,
-            notificationEmail: email,
+            name: dto.name,
+            notificationEmail: dto.email,
             notificationEmailVerified: true,
           }),
         );
@@ -89,7 +89,7 @@ export class ModeratorsService {
         await manager.insert(Provider, {
           userId: created.id,
           provider: IdentityProvider.LOCAL,
-          providerKey: email,
+          providerKey: dto.email,
           verified: true,
           passwordHash: null,
         });
@@ -98,7 +98,7 @@ export class ModeratorsService {
           actionType: SystemActionType.MODERATOR_CREATION,
           targetId: created.id,
           targetName: created.name,
-          note,
+          note: dto.note,
         });
 
         return created;
@@ -111,11 +111,11 @@ export class ModeratorsService {
       throw error;
     }
 
-    await this.enqueueCredentialsEmail(user.id, email);
+    await this.enqueueCredentialsEmail(user.id, dto.email);
 
     return {
       id: user.id,
-      email,
+      email: dto.email,
       name: user.name,
       role: user.role,
       status: user.status,

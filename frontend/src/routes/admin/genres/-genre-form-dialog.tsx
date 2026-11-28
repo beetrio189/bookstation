@@ -57,7 +57,7 @@ export function GenreFormDialog({
     try {
       if (isEdit) {
         await api(`/admin/genres/${genre.id}`, {
-          method: "PATCH",
+          method: "PUT",
           auth: true,
           body,
         });

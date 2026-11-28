@@ -48,9 +48,9 @@ export class PublisherEditorsController {
   remove(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: ActionNoteDto,
+    @Body() dto: ActionNoteDto,
   ) {
-    return this.publisherEditorsService.remove(user, id, note);
+    return this.publisherEditorsService.remove(user, id, dto.note);
   }
 
   @Post(':id/reset-password')
@@ -59,8 +59,8 @@ export class PublisherEditorsController {
   resetPassword(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: ActionNoteDto,
+    @Body() dto: ActionNoteDto,
   ) {
-    return this.publisherEditorsService.resetPassword(user, id, note);
+    return this.publisherEditorsService.resetPassword(user, id, dto.note);
   }
 }

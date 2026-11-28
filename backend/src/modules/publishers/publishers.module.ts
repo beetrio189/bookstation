@@ -1,3 +1,5 @@
+import { FeaturedPublisherController } from './featured-publisher.controller';
+import { FeaturedPublisherService } from './featured-publisher.service';
 import { Module } from '@nestjs/common';
 import { CoverQueueModule } from '../books/cover-queue.module';
 import { MailQueueModule } from '../mail/mail-queue.module';
@@ -16,6 +18,7 @@ import { PublisherSubscriptionService } from './publisher-subscription.service';
 @Module({
   imports: [MailQueueModule, CoverQueueModule],
   controllers: [
+    FeaturedPublisherController,
     PublisherSubscriptionController,
     PublisherPlansController,
     PublisherPaymentsController,
@@ -23,6 +26,7 @@ import { PublisherSubscriptionService } from './publisher-subscription.service';
     PublisherBooksController,
   ],
   providers: [
+    FeaturedPublisherService,
     PublisherSubscriptionService,
     PublisherPlansService,
     PublisherPaymentsService,

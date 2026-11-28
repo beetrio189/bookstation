@@ -61,7 +61,7 @@ export interface PublisherDetail {
   userId: string;
   email: string;
   publisherName: string;
-  logoUrl: string | null;
+  logoPublicId: string | null;
   description: string | null;
   subscriptionTier: string;
   planEndsAt: Date | null;
@@ -127,13 +127,19 @@ export class PublishersService {
    */
   async create(
     actorId: string,
-    { email, publisherName, note }: CreatePublisherDto,
+    dto: CreatePublisherDto,
   ): Promise<PublisherCreated> {
     let publisher: Publisher;
 
     try {
       publisher = await this.manager.transaction((manager) =>
-        this.insertPublisher(manager, actorId, email, publisherName, note),
+        this.insertPublisher(
+          manager,
+          actorId,
+          dto.email,
+          dto.publisherName,
+          dto.note,
+        ),
       );
     } catch (error) {
       if (
@@ -146,7 +152,7 @@ export class PublishersService {
       throw error;
     }
 
-    await this.enqueueCredentialsEmail(publisher.userId, email);
+    await this.enqueueCredentialsEmail(publisher.userId, dto.email);
 
     const freePlan = await this.manager.findOneOrFail(Plan, {
       select: { name: true },
@@ -155,7 +161,7 @@ export class PublishersService {
 
     return {
       id: publisher.id,
-      email,
+      email: dto.email,
       publisherName: publisher.publisherName,
       slug: publisher.slug,
       subscriptionTier: freePlan.name,
@@ -163,7 +169,7 @@ export class PublishersService {
     };
   }
 
-  async list({ page, limit, q }: SearchPageQuery): Promise<PublisherPage> {
+  async list(params: SearchPageQuery): Promise<PublisherPage> {
     const query = this.manager
       .createQueryBuilder(Publisher, 'publisher')
       .innerJoin(User, 'user', 'user.id = publisher.user_id')
@@ -178,14 +184,14 @@ export class PublishersService {
       .addSelect('user.status', 'status')
       .addSelect('provider.password_hash IS NOT NULL', 'hasPassword');
 
-    if (q) {
-      if (Array.from(q).length < FUZZY_MIN_LENGTH) {
+    if (params.q) {
+      if (Array.from(params.q).length < FUZZY_MIN_LENGTH) {
         query.where('publisher.search_text ILIKE f_unaccent(:like)', {
-          like: `%${escapeLike(q)}%`,
+          like: `%${escapeLike(params.q)}%`,
         });
       } else {
         query
-          .where('f_unaccent(:q) <% publisher.search_text', { q })
+          .where('f_unaccent(:q) <% publisher.search_text', { q: params.q })
           .orderBy(
             'word_similarity(f_unaccent(:q), publisher.search_text)',
             'DESC',
@@ -197,16 +203,16 @@ export class PublishersService {
     const items = await query
       .addOrderBy('publisher.created_at', 'DESC')
       .addOrderBy('publisher.id', 'DESC')
-      .offset((page - 1) * limit)
-      .limit(limit)
+      .offset((params.page - 1) * params.limit)
+      .limit(params.limit)
       .getRawMany<PublisherListItem>();
 
     return {
       items,
-      page,
-      limit,
+      page: params.page,
+      limit: params.limit,
       total,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / params.limit),
     };
   }
 
@@ -224,7 +230,7 @@ export class PublishersService {
       .addSelect('user.id', 'userId')
       .addSelect('provider.provider_key', 'email')
       .addSelect('publisher.publisher_name', 'publisherName')
-      .addSelect('publisher.logo_url', 'logoUrl')
+      .addSelect('publisher.logo_public_id', 'logoPublicId')
       .addSelect('publisher.description', 'description')
       .addSelect(
         `COALESCE((${CURRENT_PAYMENT_SQL.replace('{col}', 'pm.plan_name')}), (${FREE_PLAN_NAME_SQL}))`,

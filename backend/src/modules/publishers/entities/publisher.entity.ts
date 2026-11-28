@@ -21,8 +21,9 @@ export class Publisher {
   @Column({ type: 'varchar', length: 255 })
   slug: string;
 
-  @Column({ name: 'logo_url', type: 'text', nullable: true })
-  logoUrl: string | null;
+  // public_id trên Cloudinary, FE tự ghép URL (t_logo_small / t_logo_large)
+  @Column({ name: 'logo_public_id', type: 'text', nullable: true })
+  logoPublicId: string | null;
 
   @Column({ type: 'text', nullable: true })
   description: string | null;

@@ -43,9 +43,9 @@ export class ModeratorsController {
   remove(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: ActionNoteDto,
+    @Body() dto: ActionNoteDto,
   ) {
-    return this.moderatorsService.remove(user.id, id, note);
+    return this.moderatorsService.remove(user.id, id, dto.note);
   }
 
   @Roles(RoleCode.ADMIN)
@@ -54,8 +54,8 @@ export class ModeratorsController {
   resetPassword(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: ActionNoteDto,
+    @Body() dto: ActionNoteDto,
   ) {
-    return this.moderatorsService.resetPassword(user.id, id, note);
+    return this.moderatorsService.resetPassword(user.id, id, dto.note);
   }
 }

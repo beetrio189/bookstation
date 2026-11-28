@@ -1,6 +1,8 @@
 import { api } from "@/lib/api";
+import { imageUrl } from "@/lib/cloudinary";
 
-export type ContributorRole = "author" | "translator" | "editor" | "illustrator";
+export type ContributorRole =
+  "author" | "translator" | "editor" | "illustrator";
 
 export interface Contributor {
   name: string;
@@ -93,24 +95,16 @@ export const BOOK_ERROR_CODES = {
   INVALID_COVER: 5002,
 } as const;
 
-// Named transformation trên Cloudinary (strict: chỉ dùng được các cỡ này)
 const COVER_SIZES = {
-  thumb: "t_cover_thumb", // 80×120, bìa 40×60 trong bảng
-  card: "t_cover_card", // 400×600
-  detail: "t_cover_detail", // 600×900
+  thumb: "coverThumb",
+  card: "coverCard",
+  detail: "coverDetail",
 } as const;
-
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as
-  | string
-  | undefined;
 
 export const coverUrl = (
   publicId: string | undefined,
   size: keyof typeof COVER_SIZES,
-) =>
-  publicId && CLOUD_NAME
-    ? `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${COVER_SIZES[size]}/${publicId}`
-    : undefined;
+) => imageUrl(publicId, COVER_SIZES[size]);
 
 export class CoverUploadError extends Error {}
 

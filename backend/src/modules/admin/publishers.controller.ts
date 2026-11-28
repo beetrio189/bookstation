@@ -49,9 +49,9 @@ export class PublishersController {
   resetPassword(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: RequiredNoteDto,
+    @Body() dto: RequiredNoteDto,
   ) {
-    return this.publishersService.resetPassword(user.id, id, note);
+    return this.publishersService.resetPassword(user.id, id, dto.note);
   }
 
   @Post(':id/lock')
@@ -59,9 +59,9 @@ export class PublishersController {
   lock(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: RequiredNoteDto,
+    @Body() dto: RequiredNoteDto,
   ) {
-    return this.publishersService.lock(user.id, id, note);
+    return this.publishersService.lock(user.id, id, dto.note);
   }
 
   @Delete(':id')
@@ -69,9 +69,9 @@ export class PublishersController {
   remove(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: RequiredNoteDto,
+    @Body() dto: RequiredNoteDto,
   ) {
-    return this.publishersService.remove(user.id, id, note);
+    return this.publishersService.remove(user.id, id, dto.note);
   }
 
   @Post(':id/unlock')
@@ -79,8 +79,8 @@ export class PublishersController {
   unlock(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: RequiredNoteDto,
+    @Body() dto: RequiredNoteDto,
   ) {
-    return this.publishersService.unlock(user.id, id, note);
+    return this.publishersService.unlock(user.id, id, dto.note);
   }
 }

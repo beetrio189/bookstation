@@ -170,6 +170,7 @@ export class PublisherPaymentsService {
         duration: plan.duration,
         bookLimit: plan.bookLimit,
         editorLimit: plan.editorLimit,
+        featuredWeight: plan.featuredWeight,
         price: quote.price,
         creditUsed: quote.creditUsed,
         orderCode,

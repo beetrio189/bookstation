@@ -4,32 +4,32 @@ import {
   IsPlanDescription,
   IsPlanLimit,
   IsPlanName,
-  IsPlanPrice,
+  IsPlanWeight,
 } from './plan-fields';
 
 /**
- * Sửa gói: gửi trường nào sửa trường đó, quy tắc như lúc tạo. Không sửa thời hạn
- * (ghim để lịch sử không lẫn); trường lạ (durationMonths…) bị bỏ. description ""
- * là xóa mô tả. Không có trường nào để sửa thì service báo NOTHING_TO_UPDATE.
+ * Sửa gói (PUT): gửi đủ mọi trường, quy tắc như lúc tạo. Không sửa thời hạn
+ * (ghim để lịch sử không lẫn); trường lạ (durationMonths…) bị bỏ. Thiếu
+ * description hoặc gửi "" là xóa mô tả. DTO chỉ bắt giá ≥ 0 vì không biết gói
+ * Free hay trả phí: service kiểm tiếp (Free phải 0 đ, trả phí ≥ MIN_PAYMENT_AMOUNT).
  */
 export class UpdatePlanDto extends RequiredNoteDto {
   @IsPlanName()
-  @IsOptional()
-  name?: string;
+  name: string;
 
   @IsPlanDescription()
   @IsOptional()
   description?: string;
 
-  @IsPlanPrice()
-  @IsOptional()
-  price?: number;
+  @IsPlanLimit('Giá')
+  price: number;
 
   @IsPlanLimit('Số sách tối đa')
-  @IsOptional()
-  bookLimit?: number;
+  bookLimit: number;
 
   @IsPlanLimit('Số biên tập viên tối đa')
-  @IsOptional()
-  editorLimit?: number;
+  editorLimit: number;
+
+  @IsPlanWeight()
+  featuredWeight: number;
 }

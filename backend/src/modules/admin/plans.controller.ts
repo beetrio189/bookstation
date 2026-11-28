@@ -4,8 +4,8 @@ import {
   Delete,
   Get,
   Header,
-  Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import { IdParam } from '../../decorators/id-param.decorator';
@@ -33,7 +33,7 @@ export class PlansController {
     return this.plansService.list();
   }
 
-  @Patch(':id')
+  @Put(':id')
   @Header('Cache-Control', 'no-store')
   update(
     @CurrentUser() user: AuthUser,

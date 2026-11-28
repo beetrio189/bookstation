@@ -86,9 +86,9 @@ export class PublisherBooksService {
    */
   async list(
     user: AuthUser,
-    { page, limit, q, genres = [] }: ListPublisherBooksQuery,
+    params: ListPublisherBooksQuery,
   ): Promise<PublisherBookPage> {
-    if (genres.includes(UNCATEGORIZED) && genres.length > 1) {
+    if (params.genres.includes(UNCATEGORIZED) && params.genres.length > 1) {
       throw new AppException(
         ERRORS.VALIDATION_ERROR,
         'Không thể chọn "Chưa phân loại" cùng thể loại khác',
@@ -97,12 +97,12 @@ export class PublisherBooksService {
 
     const query = this.selectBooks(await this.publisherIdOf(user));
 
-    if (genres[0] === UNCATEGORIZED) {
+    if (params.genres[0] === UNCATEGORIZED) {
       query.andWhere(
         'NOT EXISTS (SELECT 1 FROM book_genres bg WHERE bg.book_id = book.id)',
       );
     } else {
-      [...new Set(genres.map((id) => id.toLowerCase()))].forEach(
+      [...new Set(params.genres.map((id) => id.toLowerCase()))].forEach(
         (genreId, i) => {
           query.andWhere(
             `EXISTS (SELECT 1 FROM book_genres bg WHERE bg.book_id = book.id AND bg.genre_id = :genre${i})`,
@@ -112,14 +112,16 @@ export class PublisherBooksService {
       );
     }
 
-    if (q) {
-      if (Array.from(q).length < FUZZY_MIN_LENGTH) {
+    if (params.q) {
+      if (Array.from(params.q).length < FUZZY_MIN_LENGTH) {
         query.andWhere('book.search_text LIKE f_unaccent(lower(:like))', {
-          like: `%${escapeLike(q)}%`,
+          like: `%${escapeLike(params.q)}%`,
         });
       } else {
         query
-          .andWhere('f_unaccent(lower(:q)) <% book.search_text', { q })
+          .andWhere('f_unaccent(lower(:q)) <% book.search_text', {
+            q: params.q,
+          })
           .orderBy(
             'word_similarity(f_unaccent(lower(:q)), book.search_text)',
             'DESC',
@@ -131,16 +133,16 @@ export class PublisherBooksService {
     const items = await query
       .addOrderBy('book.created_at', 'DESC')
       .addOrderBy('book.id', 'DESC')
-      .offset((page - 1) * limit)
-      .limit(limit)
+      .offset((params.page - 1) * params.limit)
+      .limit(params.limit)
       .getRawMany<PublisherBookItem>();
 
     return {
       items,
-      page,
-      limit,
+      page: params.page,
+      limit: params.limit,
       total,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / params.limit),
     };
   }
 

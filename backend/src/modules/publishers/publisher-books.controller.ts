@@ -65,8 +65,8 @@ export class PublisherBooksController {
   remove(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: ActionNoteDto,
+    @Body() dto: ActionNoteDto,
   ) {
-    return this.publisherBooksService.remove(user, id, note);
+    return this.publisherBooksService.remove(user, id, dto.note);
   }
 }

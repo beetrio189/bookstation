@@ -36,6 +36,10 @@ export class Payment {
   @Column({ name: 'editor_limit', type: 'integer' })
   editorLimit: number;
 
+  // Snapshot trọng số của gói lúc mua (hàng "Sách mới từ NXB …")
+  @Column({ name: 'featured_weight', type: 'integer', default: 1 })
+  featuredWeight: number;
+
   // Giá lúc mua (VND), đổi plans.price sau này không ảnh hưởng lịch sử
   @Column({ type: 'integer' })
   price: number;

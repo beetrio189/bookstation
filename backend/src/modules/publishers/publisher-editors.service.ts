@@ -121,10 +121,7 @@ export class PublisherEditorsService {
    * + log trong một transaction, rồi đẩy job để worker sinh mật khẩu và gửi mail
    * (đẩy lỗi chỉ log, vẫn 201).
    */
-  async create(
-    user: AuthUser,
-    { email, name, note }: CreateEditorDto,
-  ): Promise<EditorCreated> {
+  async create(user: AuthUser, dto: CreateEditorDto): Promise<EditorCreated> {
     const publisherId = await findPublisherId(
       this.dataSource.manager,
       user.id,
@@ -149,7 +146,7 @@ export class PublisherEditorsService {
         if (
           await manager.existsBy(Provider, {
             provider: IdentityProvider.LOCAL,
-            providerKey: email,
+            providerKey: dto.email,
           })
         ) {
           throw new AppException(ERRORS.EMAIL_ALREADY_EXISTS);
@@ -158,8 +155,8 @@ export class PublisherEditorsService {
         const account = await manager.save(
           manager.create(User, {
             role: RoleCode.EDITOR,
-            name,
-            notificationEmail: email,
+            name: dto.name,
+            notificationEmail: dto.email,
             notificationEmailVerified: true,
           }),
         );
@@ -167,7 +164,7 @@ export class PublisherEditorsService {
         await manager.insert(Provider, {
           userId: account.id,
           provider: IdentityProvider.LOCAL,
-          providerKey: email,
+          providerKey: dto.email,
           verified: true,
           passwordHash: null,
         });
@@ -180,7 +177,7 @@ export class PublisherEditorsService {
           actionType: SystemActionType.EDITOR_CREATION,
           targetId: editor.id,
           targetName: account.name,
-          note,
+          note: dto.note,
         });
 
         return { account, editor };
@@ -196,7 +193,7 @@ export class PublisherEditorsService {
     try {
       await this.mailQueueService.enqueueAccountCredentialsEmail(
         created.account.id,
-        email,
+        dto.email,
         'editor',
       );
     } catch (error) {
@@ -205,7 +202,7 @@ export class PublisherEditorsService {
 
     return {
       id: created.account.id,
-      email,
+      email: dto.email,
       name: created.account.name,
       role: RoleCode.EDITOR,
       createdAt: created.editor.createdAt,

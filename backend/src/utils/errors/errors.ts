@@ -150,7 +150,7 @@ export const ERRORS = {
   FREE_PLAN_PRICE_LOCKED: {
     code: 3006,
     status: HttpStatus.CONFLICT,
-    message: 'Không được đổi giá gói Free',
+    message: 'Gói Free không được trên 0 đồng',
   },
   FREE_PLAN_NOT_DELETABLE: {
     code: 3007,
@@ -169,6 +169,12 @@ export const ERRORS = {
     status: HttpStatus.CONFLICT,
     message:
       'Đã đạt số biên tập viên tối đa của gói hiện tại, hãy nâng gói để thêm biên tập viên',
+  },
+  // Sửa gói trả phí với giá dưới MIN_PAYMENT_AMOUNT (SePay không nhận)
+  PLAN_PRICE_TOO_LOW: {
+    code: 3010,
+    status: HttpStatus.BAD_REQUEST,
+    message: 'Giá tối thiểu là 1.000 đ',
   },
 
   PLAN_NOT_PURCHASABLE: {

@@ -22,5 +22,5 @@ export class ListPublisherBooksQuery extends SearchPageQuery {
   @ArrayMaxSize(10, { message: 'Chọn tối đa 10 thể loại' })
   @IsArray({ message: 'Thể loại không hợp lệ' })
   @IsOptional()
-  genres?: string[];
+  genres: string[] = [];
 }

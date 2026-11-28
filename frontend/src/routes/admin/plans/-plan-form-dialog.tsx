@@ -19,6 +19,7 @@ import {
   PLAN_NAME_MAX_LENGTH,
   PLAN_NUMBER_MAX,
   PLAN_PRICE_MIN,
+  PLAN_WEIGHT_MAX,
   planTitle,
   type PlanItem,
 } from "@/lib/plans";
@@ -32,6 +33,7 @@ interface Values {
   price: string;
   bookLimit: string;
   editorLimit: string;
+  featuredWeight: string;
   description: string;
   note: string;
 }
@@ -44,6 +46,7 @@ const toValues = (plan?: PlanItem): Values => ({
   price: plan ? String(plan.price) : "",
   bookLimit: plan ? String(plan.bookLimit) : "",
   editorLimit: plan ? String(plan.editorLimit) : "",
+  featuredWeight: plan ? String(plan.featuredWeight) : "",
   description: plan?.description ?? "",
   note: "",
 });
@@ -65,6 +68,18 @@ const checkNumber = (value: string, label: string, min: number) => {
   return number > PLAN_NUMBER_MAX ? `${label} quá lớn` : undefined;
 };
 
+const checkWeight = (value: string) => {
+  if (value === "") {
+    return "Vui lòng nhập trọng số";
+  }
+
+  const number = Number(value);
+
+  return number < 1 || number > PLAN_WEIGHT_MAX
+    ? `Trọng số từ 1 đến ${formatNumber(PLAN_WEIGHT_MAX)}`
+    : undefined;
+};
+
 function validate(values: Values, isFree: boolean): Errors {
   const name = normalizePlanName(values.name);
   const errors: Errors = {
@@ -78,6 +93,8 @@ function validate(values: Values, isFree: boolean): Errors {
       : checkNumber(values.price, "Giá", PLAN_PRICE_MIN),
     bookLimit: checkNumber(values.bookLimit, "Số sách tối đa", 0),
     editorLimit: checkNumber(values.editorLimit, "Số biên tập viên tối đa", 0),
+    // Gói Free không lên hàng "Sách mới từ…" nên không có trọng số
+    featuredWeight: isFree ? undefined : checkWeight(values.featuredWeight),
     note: values.note.trim() ? undefined : "Vui lòng nhập ghi chú",
   };
 
@@ -89,8 +106,8 @@ function validate(values: Values, isFree: boolean): Errors {
 /**
  * Thêm gói (không truyền `plan`) hoặc sửa gói. Theo Figma "Gói / Thêm (hộp thoại)",
  * "Gói / Thêm (lỗi gói đã tồn tại)", "Gói / Sửa (hộp thoại)", "Gói / Sửa (gói Free)".
- * Sửa: không đổi được thời hạn (gói Free cũng không đổi được giá), chỉ gửi các
- * trường đã đổi; chưa đổi gì thì nút Lưu bị khóa.
+ * Sửa (PUT): không đổi được thời hạn (gói Free cũng không đổi được giá), gửi đủ
+ * mọi trường; chưa đổi gì thì nút Lưu bị khóa.
  */
 export function PlanFormDialog({
   plan,
@@ -127,20 +144,26 @@ export function PlanFormDialog({
   const name = normalizePlanName(values.name);
   const description = values.description.trim();
 
-  // Chỉ các trường đã đổi (sửa); thêm thì gửi đủ
-  const changes = {
-    ...(name !== initial.name && { name }),
-    ...(!isFree &&
-      values.price !== initial.price && { price: Number(values.price) }),
-    ...(values.bookLimit !== initial.bookLimit && {
-      bookLimit: Number(values.bookLimit),
-    }),
-    ...(values.editorLimit !== initial.editorLimit && {
-      editorLimit: Number(values.editorLimit),
-    }),
-    ...(description !== initial.description && { description }),
+  // Ô đang có trên form, so với giá trị ban đầu để khóa nút Lưu khi chưa đổi gì
+  const current = {
+    name,
+    price: values.price,
+    bookLimit: values.bookLimit,
+    editorLimit: values.editorLimit,
+    featuredWeight: values.featuredWeight,
+    description,
   };
-  const hasChanges = Object.keys(changes).length > 0;
+  const hasChanges = (Object.keys(current) as (keyof typeof current)[]).some(
+    (field) => current[field] !== initial[field],
+  );
+  // Gói Free: giá (0) và trọng số giữ nguyên giá trị đang lưu vì ô bị khóa
+  const fields = {
+    name,
+    price: Number(values.price),
+    bookLimit: Number(values.bookLimit),
+    editorLimit: Number(values.editorLimit),
+    featuredWeight: Number(values.featuredWeight),
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -160,9 +183,9 @@ export function PlanFormDialog({
     try {
       if (isEdit) {
         await api(`/admin/plans/${plan.id}`, {
-          method: "PATCH",
+          method: "PUT",
           auth: true,
-          body: { ...changes, note },
+          body: { ...fields, description, note },
         });
         onSaved(`Đã lưu gói ${planTitle({ ...plan, name })}`);
       } else {
@@ -170,11 +193,8 @@ export function PlanFormDialog({
           method: "POST",
           auth: true,
           body: {
-            name,
+            ...fields,
             durationMonths,
-            price: Number(values.price),
-            bookLimit: Number(values.bookLimit),
-            editorLimit: Number(values.editorLimit),
             ...(description && { description }),
             note,
           },
@@ -189,6 +209,8 @@ export function PlanFormDialog({
 
       if (isEdit && error.status === NOT_FOUND_STATUS) {
         onGone();
+      } else if (error.code === PLAN_ERROR_CODES.PLAN_PRICE_TOO_LOW) {
+        setErrors({ price: error.message });
       } else if (error.code === PLAN_ERROR_CODES.PLAN_ALREADY_EXISTS) {
         const months = plan?.durationMonths ?? durationMonths;
         setErrors({ name: `Gói ${name} ${months} tháng đã tồn tại` });
@@ -280,6 +302,23 @@ export function PlanFormDialog({
             error={errors.editorLimit}
           />
         </div>
+        <BoxedInput
+          id="plan-featured-weight"
+          label="Trọng số lên trang chủ"
+          placeholder="VD: 1"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={4}
+          value={isFree ? "Không áp dụng cho gói Free" : values.featuredWeight}
+          onChange={set("featuredWeight", true)}
+          disabled={isFree}
+          error={errors.featuredWeight}
+          hint={
+            isFree
+              ? 'Gói Free không lên hàng "Sách mới từ…" trên trang chủ.'
+              : `Số nguyên từ 1 đến ${formatNumber(PLAN_WEIGHT_MAX)}. Trọng số càng cao, nhà xuất bản dùng gói càng hay xuất hiện ở hàng "Sách mới từ…" trên trang chủ.`
+          }
+        />
         <BoxedTextarea
           id="plan-description"
           label="Mô tả"

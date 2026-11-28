@@ -29,9 +29,9 @@ export class EditorsController {
   remove(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: RequiredNoteDto,
+    @Body() dto: RequiredNoteDto,
   ) {
-    return this.editorsService.remove(user.id, id, note);
+    return this.editorsService.remove(user.id, id, dto.note);
   }
 
   @Post(':id/reset-password')
@@ -39,8 +39,8 @@ export class EditorsController {
   resetPassword(
     @CurrentUser() user: AuthUser,
     @IdParam() id: string,
-    @Body() { note }: RequiredNoteDto,
+    @Body() dto: RequiredNoteDto,
   ) {
-    return this.editorsService.resetPassword(user.id, id, note);
+    return this.editorsService.resetPassword(user.id, id, dto.note);
   }
 }

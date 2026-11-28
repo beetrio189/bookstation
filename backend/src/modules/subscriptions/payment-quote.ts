@@ -31,6 +31,7 @@ export interface PurchaseContext {
     durationMonths: number;
     bookLimit: number;
     editorLimit: number;
+    featuredWeight: number;
   };
   quote: PaymentQuote;
 }
@@ -45,6 +46,7 @@ interface Row {
   isFree: boolean;
   bookLimit: number;
   editorLimit: number;
+  featuredWeight: number;
   books: number;
   editors: number;
   creditBalance: number;
@@ -81,6 +83,7 @@ export async function loadPurchase(
             pl.duration = '${FREE_PLAN_DURATION}' AS "isFree",
             pl.book_limit AS "bookLimit",
             pl.editor_limit AS "editorLimit",
+            pl.featured_weight AS "featuredWeight",
             (SELECT count(*) FROM books b WHERE b.publisher_id = me.id)::int AS books,
             (SELECT count(*) FROM editors e WHERE e.publisher_id = me.id)::int AS editors,
             me.credit_balance AS "creditBalance",
@@ -119,6 +122,7 @@ export async function loadPurchase(
       durationMonths: row.durationMonths,
       bookLimit: row.bookLimit,
       editorLimit: row.editorLimit,
+      featuredWeight: row.featuredWeight,
     },
     quote: calculateQuote(row.price, row.creditBalance, row.creditReturned),
   };

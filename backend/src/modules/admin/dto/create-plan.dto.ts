@@ -5,6 +5,7 @@ import {
   IsPlanLimit,
   IsPlanName,
   IsPlanPrice,
+  IsPlanWeight,
   PLAN_DURATION_MONTHS,
 } from './plan-fields';
 
@@ -35,4 +36,7 @@ export class CreatePlanDto extends RequiredNoteDto {
 
   @IsPlanLimit('Số biên tập viên tối đa')
   editorLimit: number;
+
+  @IsPlanWeight()
+  featuredWeight: number;
 }

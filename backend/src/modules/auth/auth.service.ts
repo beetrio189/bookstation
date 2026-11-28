@@ -44,37 +44,37 @@ export class AuthService {
     private readonly pwnedPasswordService: PwnedPasswordService,
   ) {}
 
-  async register({ email, password, name }: RegisterDto): Promise<void> {
-    if (await this.usersService.findLocalProvider(email)) {
+  async register(dto: RegisterDto): Promise<void> {
+    if (await this.usersService.findLocalProvider(dto.email)) {
       throw new AppException(ERRORS.EMAIL_ALREADY_EXISTS);
     }
 
-    await this.pwnedPasswordService.assertNotPwned(password);
+    await this.pwnedPasswordService.assertNotPwned(dto.password);
 
     const user = await this.createReader(
-      email,
-      await hashPassword(password),
-      name,
+      dto.email,
+      await hashPassword(dto.password),
+      dto.name,
     );
 
-    await this.enqueueVerificationEmail(user.id, email);
+    await this.enqueueVerificationEmail(user.id, dto.email);
   }
 
-  async verifyEmail({ uid, token }: VerifyEmailDto): Promise<void> {
+  async verifyEmail(dto: VerifyEmailDto): Promise<void> {
     const isValid = await this.oneTimeTokenService.peek(
       OneTimeTokenPurpose.VERIFY_EMAIL,
-      uid,
-      token,
+      dto.uid,
+      dto.token,
     );
 
-    if (!isValid || !(await this.usersService.markLocalVerified(uid))) {
+    if (!isValid || !(await this.usersService.markLocalVerified(dto.uid))) {
       throw new AppException(ERRORS.INVALID_TOKEN);
     }
 
     await this.oneTimeTokenService.consume(
       OneTimeTokenPurpose.VERIFY_EMAIL,
-      uid,
-      token,
+      dto.uid,
+      dto.token,
     );
   }
 
@@ -96,11 +96,13 @@ export class AuthService {
     void this.enqueueVerificationEmail(provider.userId, email);
   }
 
-  async login({ email, password }: LoginDto) {
-    const provider = await this.usersService.findLocalProviderForLogin(email);
+  async login(dto: LoginDto) {
+    const provider = await this.usersService.findLocalProviderForLogin(
+      dto.email,
+    );
     const isPasswordCorrect = await verifyPassword(
       provider?.passwordHash ?? DUMMY_PASSWORD_HASH,
-      password,
+      dto.password,
     );
 
     if (!provider?.passwordHash || !isPasswordCorrect) {
@@ -165,18 +167,14 @@ export class AuthService {
     void this.enqueuePasswordResetEmail(provider.userId, email);
   }
 
-  async resetPassword({
-    uid,
-    token,
-    newPassword,
-  }: ResetPasswordDto): Promise<void> {
-    await this.pwnedPasswordService.assertNotPwned(newPassword);
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    await this.pwnedPasswordService.assertNotPwned(dto.newPassword);
 
     // Lua GET + DEL nguyên tử: hai request cùng lúc với một token thì chỉ một request đi tiếp
     const isConsumed = await this.oneTimeTokenService.consume(
       OneTimeTokenPurpose.RESET_PASSWORD,
-      uid,
-      token,
+      dto.uid,
+      dto.token,
     );
 
     if (!isConsumed) {
@@ -185,8 +183,8 @@ export class AuthService {
 
     // Kiểm tra khóa sau token: ai biết uid cũng không dò được tài khoản bị khóa
     const result = await this.usersService.resetLocalPassword(
-      uid,
-      await hashPassword(newPassword),
+      dto.uid,
+      await hashPassword(dto.newPassword),
     );
 
     if (result.status === 'no-local-login') {
@@ -197,13 +195,10 @@ export class AuthService {
       throw new AppException(ERRORS.ACCOUNT_LOCKED);
     }
 
-    await this.enqueuePasswordChangedEmail(uid, result.email);
+    await this.enqueuePasswordChangedEmail(dto.uid, result.email);
   }
 
-  async changePassword(
-    userId: string,
-    { currentPassword, newPassword }: ChangePasswordDto,
-  ): Promise<void> {
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
     const provider =
       await this.usersService.findLocalProviderWithPassword(userId);
 
@@ -211,20 +206,20 @@ export class AuthService {
       throw new AppException(ERRORS.PASSWORD_NOT_SET);
     }
 
-    if (!(await verifyPassword(provider.passwordHash, currentPassword))) {
+    if (!(await verifyPassword(provider.passwordHash, dto.currentPassword))) {
       throw new AppException(ERRORS.WRONG_PASSWORD);
     }
 
-    if (newPassword === currentPassword) {
+    if (dto.newPassword === dto.currentPassword) {
       throw new AppException(ERRORS.SAME_PASSWORD);
     }
 
-    await this.pwnedPasswordService.assertNotPwned(newPassword);
+    await this.pwnedPasswordService.assertNotPwned(dto.newPassword);
 
     const result = await this.usersService.changeLocalPassword(
       userId,
       provider.passwordHash,
-      await hashPassword(newPassword),
+      await hashPassword(dto.newPassword),
     );
 
     if (result.status === 'password-changed-meanwhile') {

@@ -63,13 +63,13 @@ function searchMock(keyword: string): SearchResult {
 }
 
 /**
- * Tìm sách và nhà xuất bản (không tìm theo tác giả). Gọi GET /api/reader/search;
+ * Tìm sách và nhà xuất bản (không tìm theo tác giả). Gọi GET /api/search;
  * API chưa có hoặc lỗi thì dùng dữ liệu mock, không hiện toast.
  */
 export async function searchCatalog(keyword: string): Promise<SearchResult> {
   try {
     const result = await api<Partial<SearchResult>>(
-      `/reader/search?q=${encodeURIComponent(keyword)}`,
+      `/search?q=${encodeURIComponent(keyword)}`,
       { silent: true },
     );
 

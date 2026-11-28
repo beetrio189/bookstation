@@ -5,6 +5,7 @@ import {
   LockKeyholeOpen,
   Trash2,
 } from "lucide-react";
+import { imageUrl } from "@/lib/cloudinary";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -121,7 +122,7 @@ export function PublisherDetail() {
         )}
 
         <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:gap-8">
-          <Avatar src={detail.logoUrl} size={120} />
+          <Avatar src={imageUrl(detail.logoPublicId, "logoLarge")} size={120} />
           <div className="flex min-w-0 flex-col gap-2.5">
             <h1 className="text-[28px] font-bold break-words sm:text-[32px]">
               {detail.publisherName}
